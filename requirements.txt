@@ -1,0 +1,11 @@
+numpy
+pandas
+pillow
+matplotlib
+streamlit
+faiss-cpu
+google-cloud-aiplatform
+tensorflow
+scikit-learn
+python-dotenv
+requests
