@@ -1,256 +1,181 @@
-import numpy as np
-import faiss
-import pickle
 import os
-import logging
-from typing import List, Dict, Any, Tuple, Optional
+import faiss
+import numpy as np
+import pickle
+from typing import List, Dict, Tuple, Optional, Union
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 class VectorDatabase:
-    """Vector database using FAISS for similarity search."""
+    """
+    Class to manage vector databases using FAISS.
+    """
     
-    def __init__(self):
-        """Initialize the vector database."""
-        self.text_index = None
-        self.image_index = None
-        self.hybrid_index = None
+    def __init__(self, dimension_text: int = 512, dimension_image: int = 1280):
+        """
+        Initialize the vector database.
+        
+        Args:
+            dimension_text (int): Dimension of text embeddings.
+            dimension_image (int): Dimension of image embeddings.
+        """
+        self.dimension_text = dimension_text
+        self.dimension_image = dimension_image
+        
+        # Initialize indices
+        self.index_text = faiss.IndexFlatL2(dimension_text)
+        self.index_image = faiss.IndexFlatL2(dimension_image)
+        
+        # Keep track of product ids
         self.product_ids = []
-        self.product_data = {}
         
-    def build_text_index(self, product_ids: List[str], text_embeddings: List[np.ndarray]) -> None:
+    def add_text_embeddings(self, embeddings: np.ndarray, ids: List[int]) -> None:
         """
-        Build the text embedding index.
+        Add text embeddings to the index.
         
         Args:
-            product_ids: List of product IDs
-            text_embeddings: List of text embedding vectors
+            embeddings (np.ndarray): Array of text embedding vectors.
+            ids (List[int]): List of product IDs.
         """
-        embeddings = np.array(text_embeddings).astype('float32')
-        dimension = embeddings.shape[1]
-        
-        # Create FAISS index
-        self.text_index = faiss.IndexFlatIP(dimension)  # Inner product for cosine similarity
-        self.text_index.add(embeddings)
-        
-        # Store product IDs
-        self.product_ids = product_ids
-        
-        logger.info(f"Built text index with {len(product_ids)} products and dimension {dimension}")
-        
-    def build_image_index(self, product_ids: List[str], image_embeddings: List[np.ndarray]) -> None:
-        """
-        Build the image embedding index.
-        
-        Args:
-            product_ids: List of product IDs
-            image_embeddings: List of image embedding vectors
-        """
-        embeddings = np.array(image_embeddings).astype('float32')
-        dimension = embeddings.shape[1]
-        
-        # Create FAISS index
-        self.image_index = faiss.IndexFlatIP(dimension)
-        self.image_index.add(embeddings)
-        
-        # Store product IDs if not already stored
-        if not self.product_ids:
-            self.product_ids = product_ids
+        if len(embeddings) == 0:
+            return
             
-        logger.info(f"Built image index with {len(product_ids)} products and dimension {dimension}")
+        # Ensure embeddings are float32
+        embeddings = embeddings.astype(np.float32)
         
-    def build_hybrid_index(self, product_ids: List[str], hybrid_embeddings: List[np.ndarray]) -> None:
+        # Add to index
+        self.index_text.add(embeddings)
+        self.product_ids.extend(ids)
+        
+    def add_image_embeddings(self, embeddings: np.ndarray, ids: List[int]) -> None:
         """
-        Build the hybrid embedding index.
+        Add image embeddings to the index.
         
         Args:
-            product_ids: List of product IDs
-            hybrid_embeddings: List of hybrid embedding vectors
+            embeddings (np.ndarray): Array of image embedding vectors.
+            ids (List[int]): List of product IDs.
         """
-        embeddings = np.array(hybrid_embeddings).astype('float32')
-        dimension = embeddings.shape[1]
-        
-        # Create FAISS index
-        self.hybrid_index = faiss.IndexFlatIP(dimension)
-        self.hybrid_index.add(embeddings)
-        
-        # Store product IDs if not already stored
-        if not self.product_ids:
-            self.product_ids = product_ids
+        if len(embeddings) == 0:
+            return
             
-        logger.info(f"Built hybrid index with {len(product_ids)} products and dimension {dimension}")
+        # Ensure embeddings are float32
+        embeddings = embeddings.astype(np.float32)
         
-    def store_product_data(self, product_data: Dict[str, Dict]) -> None:
+        # Add to index
+        self.index_image.add(embeddings)
+        
+    def search_by_text(self, query_embedding: np.ndarray, k: int = 5) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Store product metadata for retrieval.
+        Search for similar products by text.
         
         Args:
-            product_data: Dictionary with product metadata
-        """
-        self.product_data = product_data
-        logger.info(f"Stored metadata for {len(product_data)} products")
-        
-    def search_by_text(self, query_embedding: np.ndarray, k: int = 5) -> List[Dict]:
-        """
-        Search for similar products using text embedding.
-        
-        Args:
-            query_embedding: Query text embedding
-            k: Number of results to return
+            query_embedding (np.ndarray): Text embedding of the query.
+            k (int): Number of results to return.
             
         Returns:
-            List of similar product metadata
+            Tuple[np.ndarray, np.ndarray]: Tuple of (distances, indices).
         """
-        if self.text_index is None:
-            logger.error("Text index is not built")
-            return []
-            
-        # Convert to numpy array and ensure correct shape and type
-        query_embedding = np.array(query_embedding).astype('float32').reshape(1, -1)
+        # Ensure query is float32
+        query_embedding = query_embedding.astype(np.float32).reshape(1, -1)
         
-        # Search the index
-        distances, indices = self.text_index.search(query_embedding, k)
+        # Search index
+        distances, indices = self.index_text.search(query_embedding, k)
         
-        # Get product data for results
-        results = []
-        for i, idx in enumerate(indices[0]):
-            if idx < len(self.product_ids) and idx >= 0:
-                product_id = self.product_ids[idx]
-                if product_id in self.product_data:
-                    result = self.product_data[product_id].copy()
-                    result['similarity_score'] = float(distances[0][i])
-                    results.append(result)
-                    
-        return results
-        
-    def search_by_image(self, query_embedding: np.ndarray, k: int = 5) -> List[Dict]:
-        """
-        Search for similar products using image embedding.
-        
-        Args:
-            query_embedding: Query image embedding
-            k: Number of results to return
-            
-        Returns:
-            List of similar product metadata
-        """
-        if self.image_index is None:
-            logger.error("Image index is not built")
-            return []
-            
-        # Convert to numpy array and ensure correct shape and type
-        query_embedding = np.array(query_embedding).astype('float32').reshape(1, -1)
-        
-        # Search the index
-        distances, indices = self.image_index.search(query_embedding, k)
-        
-        # Get product data for results
-        results = []
-        for i, idx in enumerate(indices[0]):
-            if idx < len(self.product_ids) and idx >= 0:
-                product_id = self.product_ids[idx]
-                if product_id in self.product_data:
-                    result = self.product_data[product_id].copy()
-                    result['similarity_score'] = float(distances[0][i])
-                    results.append(result)
-                    
-        return results
-        
-    def search_by_hybrid(self, query_embedding: np.ndarray, k: int = 5) -> List[Dict]:
-        """
-        Search for similar products using hybrid embedding.
-        
-        Args:
-            query_embedding: Query hybrid embedding
-            k: Number of results to return
-            
-        Returns:
-            List of similar product metadata
-        """
-        if self.hybrid_index is None:
-            logger.error("Hybrid index is not built")
-            return []
-            
-        # Convert to numpy array and ensure correct shape and type
-        query_embedding = np.array(query_embedding).astype('float32').reshape(1, -1)
-        
-        # Search the index
-        distances, indices = self.hybrid_index.search(query_embedding, k)
-        
-        # Get product data for results
-        results = []
-        for i, idx in enumerate(indices[0]):
-            if idx < len(self.product_ids) and idx >= 0:
-                product_id = self.product_ids[idx]
-                if product_id in self.product_data:
-                    result = self.product_data[product_id].copy()
-                    result['similarity_score'] = float(distances[0][i])
-                    results.append(result)
-                    
-        return results
+        return distances, indices
     
-    def save_indexes(self, save_dir: str) -> None:
+    def search_by_image(self, query_embedding: np.ndarray, k: int = 5) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Save FAISS indexes and associated data to disk.
+        Search for similar products by image.
         
         Args:
-            save_dir: Directory to save indexes
+            query_embedding (np.ndarray): Image embedding of the query.
+            k (int): Number of results to return.
+            
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: Tuple of (distances, indices).
+        """
+        # Ensure query is float32
+        query_embedding = query_embedding.astype(np.float32).reshape(1, -1)
+        
+        # Search index
+        distances, indices = self.index_image.search(query_embedding, k)
+        
+        return distances, indices
+    
+    def hybrid_search(self, text_embedding: Optional[np.ndarray] = None, 
+                     image_embedding: Optional[np.ndarray] = None, 
+                     k: int = 5, alpha: float = 0.5) -> List[int]:
+        """
+        Perform hybrid search combining text and image similarity.
+        
+        Args:
+            text_embedding (np.ndarray, optional): Text embedding of the query.
+            image_embedding (np.ndarray, optional): Image embedding of the query.
+            k (int): Number of results to return.
+            alpha (float): Weight for text search (1-alpha will be weight for image search).
+            
+        Returns:
+            List[int]: List of product indices.
+        """
+        results = {}
+        
+        # If we have text embedding, search by text
+        if text_embedding is not None:
+            text_distances, text_indices = self.search_by_text(text_embedding, k=k*2)
+            
+            # Add to results dict with weight
+            for i, idx in enumerate(text_indices[0]):
+                if idx not in results:
+                    results[idx] = 0
+                results[idx] += alpha * (1 - text_distances[0][i] / max(text_distances[0]))
+        
+        # If we have image embedding, search by image
+        if image_embedding is not None:
+            image_distances, image_indices = self.search_by_image(image_embedding, k=k*2)
+            
+            # Add to results dict with weight
+            for i, idx in enumerate(image_indices[0]):
+                if idx not in results:
+                    results[idx] = 0
+                results[idx] += (1 - alpha) * (1 - image_distances[0][i] / max(image_distances[0]))
+        
+        # Sort by combined score and get top k
+        sorted_results = sorted(results.items(), key=lambda x: x[1], reverse=True)[:k]
+        
+        # Return just the indices
+        return [idx for idx, _ in sorted_results]
+    
+    def save_indices(self, save_dir: str) -> None:
+        """
+        Save the FAISS indices to disk.
+        
+        Args:
+            save_dir (str): Directory to save indices to.
         """
         os.makedirs(save_dir, exist_ok=True)
         
-        # Save indexes
-        if self.text_index is not None:
-            faiss.write_index(self.text_index, os.path.join(save_dir, "text_index.faiss"))
+        # Save text index
+        faiss.write_index(self.index_text, os.path.join(save_dir, 'text_index.faiss'))
         
-        if self.image_index is not None:
-            faiss.write_index(self.image_index, os.path.join(save_dir, "image_index.faiss"))
-            
-        if self.hybrid_index is not None:
-            faiss.write_index(self.hybrid_index, os.path.join(save_dir, "hybrid_index.faiss"))
-            
-        # Save product IDs and metadata
-        with open(os.path.join(save_dir, "product_ids.pkl"), "wb") as f:
+        # Save image index
+        faiss.write_index(self.index_image, os.path.join(save_dir, 'image_index.faiss'))
+        
+        # Save product IDs
+        with open(os.path.join(save_dir, 'product_ids.pkl'), 'wb') as f:
             pickle.dump(self.product_ids, f)
-            
-        with open(os.path.join(save_dir, "product_data.pkl"), "wb") as f:
-            pickle.dump(self.product_data, f)
-            
-        logger.info(f"Saved indexes and data to {save_dir}")
-        
-    def load_indexes(self, load_dir: str) -> None:
+    
+    def load_indices(self, save_dir: str) -> None:
         """
-        Load FAISS indexes and associated data from disk.
+        Load the FAISS indices from disk.
         
         Args:
-            load_dir: Directory to load indexes from
+            save_dir (str): Directory to load indices from.
         """
-        # Load indexes if files exist
-        text_index_path = os.path.join(load_dir, "text_index.faiss")
-        if os.path.exists(text_index_path):
-            self.text_index = faiss.read_index(text_index_path)
-            logger.info(f"Loaded text index from {text_index_path}")
-            
-        image_index_path = os.path.join(load_dir, "image_index.faiss")
-        if os.path.exists(image_index_path):
-            self.image_index = faiss.read_index(image_index_path)
-            logger.info(f"Loaded image index from {image_index_path}")
-            
-        hybrid_index_path = os.path.join(load_dir, "hybrid_index.faiss")
-        if os.path.exists(hybrid_index_path):
-            self.hybrid_index = faiss.read_index(hybrid_index_path)
-            logger.info(f"Loaded hybrid index from {hybrid_index_path}")
-            
-        # Load product IDs and metadata
-        product_ids_path = os.path.join(load_dir, "product_ids.pkl")
-        if os.path.exists(product_ids_path):
-            with open(product_ids_path, "rb") as f:
-                self.product_ids = pickle.load(f)
-            logger.info(f"Loaded product IDs from {product_ids_path}")
-            
-        product_data_path = os.path.join(load_dir, "product_data.pkl")
-        if os.path.exists(product_data_path):
-            with open(product_data_path, "rb") as f:
-                self.product_data = pickle.load(f)
-            logger.info(f"Loaded product data from {product_data_path}")
+        # Load text index
+        self.index_text = faiss.read_index(os.path.join(save_dir, 'text_index.faiss'))
+        
+        # Load image index
+        self.index_image = faiss.read_index(os.path.join(save_dir, 'image_index.faiss'))
+        
+        # Load product IDs
+        with open(os.path.join(save_dir, 'product_ids.pkl'), 'rb') as f:
+            self.product_ids = pickle.load(f)

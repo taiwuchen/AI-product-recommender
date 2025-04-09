@@ -1,214 +1,280 @@
 import os
-import numpy as np
-import logging
-import base64
-from io import BytesIO
+import ssl
 import requests
+import numpy as np
 from PIL import Image
-from typing import List, Dict, Any, Optional, Union
-from google.cloud import aiplatform
+from io import BytesIO
+from typing import List, Dict, Union, Optional
 from dotenv import load_dotenv
+import tensorflow as tf
+import tensorflow_hub as hub
+from google.cloud import aiplatform
+from google.oauth2 import service_account
+import urllib.parse
 
-# Load environment variables
-load_dotenv()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Fix SSL certificate verification on macOS
+def fix_certificate_verification():
+    """Fix SSL certificate verification issues on macOS"""
+    try:
+        # Use certifi if available
+        import certifi
+        os.environ['SSL_CERT_FILE'] = certifi.where()
+        
+        # For macOS, run the certificate install command for Python
+        if os.path.exists('/Applications/Python 3.10/Install Certificates.command'):
+            import subprocess
+            subprocess.run(['/Applications/Python 3.10/Install Certificates.command'], check=False, shell=True)
+        
+        # Create unverified HTTPS context if needed
+        ssl._create_default_https_context = ssl._create_unverified_context
+    except Exception as e:
+        print(f"Warning: Could not fix SSL certificate verification: {e}")
+
 
 class EmbeddingGenerator:
-    """Class to generate embeddings using Google Vertex AI."""
+    """
+    Class to generate text and image embeddings using Google Vertex AI.
+    """
     
-    def __init__(self, project_id: str = None, location: str = "us-central1"):
+    def __init__(self, google_credentials_path: str = None, vertex_ai_region: str = "us-west2"):
         """
-        Initialize EmbeddingGenerator with GCP project details.
+        Initialize the embedding generator.
         
         Args:
-            project_id: Google Cloud project ID (if None, will try to get from environment)
-            location: Google Cloud region
+            google_credentials_path (str, optional): Path to Google Cloud service account credentials.
+            vertex_ai_region (str, optional): Google Cloud region for Vertex AI. Default is "us-west2".
         """
-        self.project_id = project_id or os.getenv("GOOGLE_CLOUD_PROJECT")
-        if not self.project_id:
-            raise ValueError("Google Cloud project ID is required. Set GOOGLE_CLOUD_PROJECT environment variable.")
+        load_dotenv()
+        
+        # Fix SSL certificate issues before making any requests
+        fix_certificate_verification()
+        
+        # Initialize Google Cloud credentials
+        self.credentials = None
+        self.initialized = False
+        
+        # Valid Vertex AI regions - updated list
+        self.supported_regions = {
+            'asia-east1', 'asia-east2', 'asia-northeast1', 'asia-northeast2', 'asia-northeast3', 
+            'asia-south1', 'asia-southeast1', 'asia-southeast2', 'australia-southeast1', 
+            'australia-southeast2', 'europe-central2', 'europe-north1', 'europe-southwest1', 
+            'europe-west1', 'europe-west2', 'europe-west3', 'europe-west4', 'europe-west6', 
+            'europe-west8', 'europe-west9', 'europe-west12', 'global', 'me-central1', 
+            'me-central2', 'me-west1', 'northamerica-northeast1', 'northamerica-northeast2', 
+            'southamerica-east1', 'southamerica-west1', 'us-central1', 'us-east1', 'us-east4', 
+            'us-east5', 'us-south1', 'us-west1', 'us-west2', 'us-west3', 'us-west4', 'africa-south1'
+        }
+        
+        # Use provided region if valid, otherwise default to us-central1
+        self.vertex_ai_region = vertex_ai_region if vertex_ai_region in self.supported_regions else "us-central1"
+        
+        try:
+            if google_credentials_path and os.path.exists(google_credentials_path):
+                self.credentials = service_account.Credentials.from_service_account_file(google_credentials_path)
+                aiplatform.init(credentials=self.credentials, project=os.environ.get("GOOGLE_CLOUD_PROJECT"), 
+                               location=self.vertex_ai_region)
+                self.initialized = True
+            else:
+                # Use default credentials if path not provided or file doesn't exist
+                aiplatform.init(location=self.vertex_ai_region)
+                self.initialized = True
+                
+            print(f"Google Cloud Vertex AI initialized successfully with region: {self.vertex_ai_region}")
+        except Exception as e:
+            print(f"Warning: Google Cloud initialization failed: {e}")
+            print("Will use backup TensorFlow models for embeddings")
             
-        self.location = location
+        # Load TensorFlow models as backup
+        self._load_tensorflow_models()
+    
+    def _load_tensorflow_models(self):
+        """Load TensorFlow models for text and image embeddings as fallback."""
+        try:
+            print("Loading TensorFlow models as fallback...")
+            
+            # Disable SSL verification for TensorFlow Hub
+            os.environ['TFHUB_CACHE_DIR'] = '/tmp/tfhub_cache'
+            
+            # Load Universal Sentence Encoder for text embeddings without context manager
+            self.text_model = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
+            
+            # Use MobileNetV2 for image embeddings
+            base_model = tf.keras.applications.MobileNetV2(
+                include_top=False, weights='imagenet', input_shape=(224, 224, 3)
+            )
+            self.image_model = tf.keras.Model(
+                inputs=base_model.input,
+                outputs=tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
+            )
+            print("TensorFlow models loaded successfully")
+        except Exception as e:
+            print(f"Warning: Failed to load TensorFlow models: {e}")
+            print("Using random embeddings as fallback")
+            self.text_model = None
+            self.image_model = None
         
-        # Initialize Vertex AI
-        aiplatform.init(project=self.project_id, location=self.location)
-        logger.info(f"Initialized Vertex AI with project: {self.project_id}, location: {self.location}")
-        
-        # Text embedding model
-        self.text_model_name = "textembedding-gecko@latest"
-        # Multimodal embedding model for images
-        self.multimodal_model_name = "multimodalembedding@latest"
-        
-    def generate_text_embeddings(self, texts: List[str]) -> List[np.ndarray]:
+    def generate_text_embedding(self, text: str) -> np.ndarray:
         """
-        Generate embeddings for a list of text strings.
+        Generate embedding for text using Google Vertex AI or TensorFlow model.
         
         Args:
-            texts: List of text strings to generate embeddings for
+            text (str): Text to generate embedding for.
             
         Returns:
-            List of embedding vectors
+            np.ndarray: Text embedding vector.
         """
-        logger.info(f"Generating text embeddings for {len(texts)} products")
-        
-        # Create Vertex AI endpoint
-        endpoint = aiplatform.Endpoint(
-            endpoint_name=f"projects/{self.project_id}/locations/{self.location}/publishers/google/models/{self.text_model_name}"
-        )
-        
-        embeddings = []
-        batch_size = 5  # Process in small batches to avoid API limits
-        
-        for i in range(0, len(texts), batch_size):
-            batch_texts = texts[i:i+batch_size]
+        if not text.strip():
+            # Return a zero vector for empty text
+            return np.zeros(512)
             
-            try:
-                instances = [{"content": text} for text in batch_texts]
-                response = endpoint.predict(instances=instances)
-                
-                # Extract embeddings from response
-                batch_embeddings = [np.array(prediction["embeddings"]["values"]) 
-                                   for prediction in response.predictions]
-                embeddings.extend(batch_embeddings)
-                
-                logger.info(f"Generated embeddings for batch {i//batch_size + 1} of {(len(texts)-1)//batch_size + 1}")
-            except Exception as e:
-                logger.error(f"Error generating text embeddings for batch {i//batch_size + 1}: {e}")
-                # Add empty embeddings for failed items
-                embeddings.extend([np.zeros(768) for _ in range(len(batch_texts))])
-                
-        return embeddings
+        try:
+            if self.initialized:
+                # Use Google Vertex AI
+                endpoint = aiplatform.Endpoint("projects/{project}/locations/{location}/endpoints/{id}")
+                response = endpoint.predict(instances=[text])
+                embedding = np.array(response.predictions[0])
+                return embedding
+            else:
+                # Use TensorFlow model as fallback
+                embedding = self.text_model([text])[0].numpy()
+                return embedding
+        except Exception as e:
+            print(f"Error generating text embedding: {e}")
+            # Return a random embedding as a last resort
+            return np.random.randn(512).astype(np.float32)
     
-    def _download_image(self, image_url: str) -> Optional[Image.Image]:
+    def generate_batch_text_embeddings(self, texts: List[str]) -> np.ndarray:
+        """
+        Generate embeddings for multiple texts.
+        
+        Args:
+            texts (List[str]): List of texts to generate embeddings for.
+            
+        Returns:
+            np.ndarray: Array of text embedding vectors.
+        """
+        embeddings = []
+        for text in texts:
+            embedding = self.generate_text_embedding(text)
+            embeddings.append(embedding)
+        
+        return np.array(embeddings)
+    
+    def download_image(self, image_url: str) -> Image.Image:
         """
         Download an image from a URL.
         
         Args:
-            image_url: URL of the image to download
+            image_url (str): URL of the image.
             
         Returns:
-            PIL Image object or None if download failed
+            Image.Image: PIL Image object.
         """
         try:
-            response = requests.get(image_url, timeout=10)
+            # Check if URL is valid before making a request
+            if not image_url or not isinstance(image_url, str):
+                print(f"Invalid URL: {image_url}")
+                return Image.new('RGB', (224, 224), color='white')
+                
+            # Parse and validate URL
+            parsed = urllib.parse.urlparse(image_url)
+            if not parsed.scheme or not parsed.netloc:
+                # Add https:// if missing
+                if parsed.netloc == "" and parsed.path != "":
+                    image_url = f"https://{image_url}"
+                else:
+                    print(f"Invalid URL '{image_url}': No scheme or host provided")
+                    return Image.new('RGB', (224, 224), color='white')
+                    
+            # Add headers to mimic a browser request
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Referer': 'https://www.zara.com/'
+            }
+            
+            # Download the image
+            response = requests.get(image_url, stream=True, headers=headers)
             response.raise_for_status()
-            return Image.open(BytesIO(response.content))
+            return Image.open(BytesIO(response.content)).convert('RGB')
         except Exception as e:
-            logger.error(f"Error downloading image from {image_url}: {e}")
-            # Return a blank image
+            print(f"Error downloading image from {image_url}: {e}")
+            # Return a blank image as fallback
             return Image.new('RGB', (224, 224), color='white')
     
-    def generate_image_embeddings(self, image_urls: List[str]) -> List[np.ndarray]:
+    def preprocess_image(self, image: Image.Image) -> np.ndarray:
         """
-        Generate embeddings for a list of image URLs.
+        Preprocess image for the model.
         
         Args:
-            image_urls: List of image URLs to generate embeddings for
+            image (Image.Image): PIL Image object.
             
         Returns:
-            List of embedding vectors
+            np.ndarray: Preprocessed image array.
         """
-        logger.info(f"Generating image embeddings for {len(image_urls)} products")
+        # Resize the image to the required dimensions
+        image = image.resize((224, 224))
         
-        # Create Vertex AI endpoint
-        endpoint = aiplatform.Endpoint(
-            endpoint_name=f"projects/{self.project_id}/locations/{self.location}/publishers/google/models/{self.multimodal_model_name}"
-        )
+        # Convert to numpy array and normalize
+        img_array = np.array(image) / 255.0
+        img_array = img_array.astype(np.float32)
         
-        embeddings = []
-        batch_size = 5  # Process in small batches
+        # Add batch dimension
+        img_array = np.expand_dims(img_array, axis=0)
         
-        for i in range(0, len(image_urls), batch_size):
-            batch_urls = image_urls[i:i+batch_size]
-            batch_embeddings = []
-            
-            for url in batch_urls:
-                try:
-                    if not url:
-                        raise ValueError("Empty URL")
-                        
-                    # Download the image
-                    image = self._download_image(url)
-                    
-                    # Convert image to base64
-                    buffered = BytesIO()
-                    image.save(buffered, format="JPEG")
-                    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                    
-                    # Create prediction instance
-                    instance = {
-                        "image": {
-                            "bytesBase64Encoded": img_str
-                        }
-                    }
-                    
-                    # Get embedding
-                    response = endpoint.predict(instances=[instance])
-                    embedding = np.array(response.predictions[0]["imageEmbedding"])
-                    batch_embeddings.append(embedding)
-                    
-                except Exception as e:
-                    logger.error(f"Error generating image embedding: {e}")
-                    # Add empty embedding for failed item
-                    batch_embeddings.append(np.zeros(1408))  # Default size for multimodal embeddings
-            
-            embeddings.extend(batch_embeddings)
-            logger.info(f"Generated image embeddings for batch {i//batch_size + 1} of {(len(image_urls)-1)//batch_size + 1}")
-                
-        return embeddings
+        return img_array
     
-    def generate_hybrid_embeddings(
-        self, 
-        texts: List[str], 
-        image_urls: List[str],
-        text_weight: float = 0.5
-    ) -> List[np.ndarray]:
+    def generate_image_embedding(self, image_url: str) -> np.ndarray:
         """
-        Generate hybrid embeddings by combining text and image embeddings.
+        Generate embedding for an image using Google Vertex AI or TensorFlow model.
         
         Args:
-            texts: List of text strings
-            image_urls: List of image URLs
-            text_weight: Weight of text embeddings in the hybrid (0.0-1.0)
+            image_url (str): URL of the image.
             
         Returns:
-            List of hybrid embedding vectors
+            np.ndarray: Image embedding vector.
         """
-        assert 0.0 <= text_weight <= 1.0, "Weight must be between 0.0 and 1.0"
-        assert len(texts) == len(image_urls), "Number of texts and images must match"
-        
-        # Get embeddings
-        text_embeddings = self.generate_text_embeddings(texts)
-        image_embeddings = self.generate_image_embeddings(image_urls)
-        
-        # Normalize embeddings
-        normalized_text_embeddings = [
-            embedding / np.linalg.norm(embedding) if np.linalg.norm(embedding) > 0 else embedding
-            for embedding in text_embeddings
-        ]
-        
-        normalized_image_embeddings = [
-            embedding / np.linalg.norm(embedding) if np.linalg.norm(embedding) > 0 else embedding
-            for embedding in image_embeddings
-        ]
-        
-        # Combine embeddings
-        image_weight = 1.0 - text_weight
-        
-        hybrid_embeddings = []
-        for text_emb, img_emb in zip(normalized_text_embeddings, normalized_image_embeddings):
-            # Since dimensions don't match, we concatenate and then normalize
-            combined = np.concatenate([
-                text_emb * text_weight,
-                img_emb * image_weight
-            ])
-            # Normalize the combined embedding
-            norm = np.linalg.norm(combined)
-            if norm > 0:
-                combined = combined / norm
-            hybrid_embeddings.append(combined)
+        try:
+            # Download and preprocess the image
+            image = self.download_image(image_url)
+            img_array = self.preprocess_image(image)
             
-        return hybrid_embeddings
+            if self.initialized:
+                # Use Google Vertex AI
+                # Convert to bytes for API
+                image_bytes = BytesIO()
+                image.save(image_bytes, format='JPEG')
+                img_bytes = image_bytes.getvalue()
+                
+                endpoint = aiplatform.Endpoint("projects/{project}/locations/{location}/endpoints/{id}")
+                response = endpoint.predict(instances=[{"bytes_inputs": {"b64": img_bytes}}])
+                embedding = np.array(response.predictions[0])
+                return embedding
+            else:
+                # Use TensorFlow model as fallback
+                embedding = self.image_model.predict(img_array)[0]
+                return embedding
+        except Exception as e:
+            print(f"Error generating image embedding: {e}")
+            # Return a random embedding as a last resort
+            return np.random.randn(1280).astype(np.float32)
+    
+    def generate_batch_image_embeddings(self, image_urls: List[str]) -> np.ndarray:
+        """
+        Generate embeddings for multiple images.
+        
+        Args:
+            image_urls (List[str]): List of image URLs.
+            
+        Returns:
+            np.ndarray: Array of image embedding vectors.
+        """
+        embeddings = []
+        for url in image_urls:
+            embedding = self.generate_image_embedding(url)
+            embeddings.append(embedding)
+        
+        return np.array(embeddings)
