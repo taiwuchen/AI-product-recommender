@@ -140,14 +140,14 @@ def generate_rag_description(products: List[Dict], query: Optional[str] = None):
                 return f"{title}\n\n{description}"
                 
         except Exception as e:
-            st.warning(f"Gemini API error: {e}. Trying OpenAI or fallback to template-based description.")
+            st.warning(f"Gemini API error: {e}. Trying alternative Gemini approach as fallback.")
     
-    # Check if OpenAI API key is available as fallback
-    openai_api_key = os.environ.get('OPENAI_API_KEY')
-    if product_info and openai_api_key:
+    # If the first attempt with Gemini failed, try an alternative approach with Gemini
+    openrouter_api_key = os.environ.get('OPENROUTER_API_KEY', os.environ.get('OPENROUTER_API_KEY'))
+    if product_info and openrouter_api_key:
         try:
-            import openai
-            openai.api_key = openai_api_key
+            import requests
+            import json
             
             # Create context from product information
             context = "Based on the following products:\n"
@@ -160,25 +160,38 @@ def generate_rag_description(products: List[Dict], query: Optional[str] = None):
             else:
                 prompt = f"{context}\n\nGenerate a concise recommendation paragraph for these products. Analyze common characteristics like product category, materials, and features. Mention how these products might suit the user's style and preferences."
             
-            # Call OpenAI API
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "You are a fashion retail assistant providing helpful product recommendations."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=300,
-                temperature=0.7
+            # Call OpenRouter API with Gemini as a fallback
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {openrouter_api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://ai-product-recommender.app",
+                    "X-Title": "AI Product Recommender",
+                },
+                data=json.dumps({
+                    "model": "google/gemini-2.5-pro-exp-03-25:free",
+                    "messages": [
+                        {"role": "system", "content": "You are a fashion retail assistant providing helpful product recommendations."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "max_tokens": 300,
+                    "temperature": 0.7
+                })
             )
             
+            response_data = response.json()
+            
             # Extract and format the response
-            if response and response.choices:
+            if response.status_code == 200 and "choices" in response_data and response_data["choices"]:
                 title = f"### AI-Generated Recommendation for '{query}'" if query else "### AI-Generated Recommendation"
-                description = response.choices[0].message.content
+                description = response_data["choices"][0]["message"]["content"]
                 return f"{title}\n\n{description}"
                 
         except Exception as e:
-            st.warning(f"LLM API error: {e}. Using template-based description instead.")
+            st.warning(f"Alternative LLM API error: {e}. Using template-based description instead.")
+    
+    
             
     # Fallback to template-based approach if LLM fails or API key not available
     if query:
@@ -295,7 +308,7 @@ def main():
         st.header("Search by Text")
         text_query = st.text_input("Enter your search query", "leather jacket with pockets", key="text_search_query")
         
-        if st.button("Search by Text", key="btn_text_search"):
+        if st.button("Search by Text"):
             if text_query.strip():
                 with st.spinner("Searching..."):
                     # Generate text embedding for the query
@@ -327,7 +340,7 @@ def main():
         # Option 2: Enter image URL
         image_url = st.text_input("Or enter an image URL", key="image_search_url")
         
-        if st.button("Search by Image", key="btn_image_search"):
+        if st.button("Search by Image"):
             image = None
             if uploaded_file is not None:
                 image = Image.open(uploaded_file)
@@ -362,16 +375,16 @@ def main():
     with tab3:
         st.header("Hybrid Search (Text + Image)")
         
-        hybrid_text = st.text_input("Enter your search query (hybrid)", "casual jacket", key="hybrid_search_query")
+        hybrid_text = st.text_input("Enter your search query (hybrid)", "casual jacket", key="hybrid_text_query")
         
         # Option to upload an image
-        hybrid_file = st.file_uploader("Choose an image (optional)", type=["jpg", "jpeg", "png"], key="hybrid_search_uploader")
+        hybrid_file = st.file_uploader("Choose an image (optional)", type=["jpg", "jpeg", "png"], key="hybrid_image_uploader")
         
         # Option to adjust weights
-        text_weight = st.slider("Text search weight", 0.0, 1.0, 0.5, 0.1, key="hybrid_text_weight")
+        text_weight = st.slider("Text search weight", 0.0, 1.0, 0.5, 0.1, key="text_weight_slider")
         image_weight = 1.0 - text_weight
         
-        if st.button("Search with Hybrid Approach", key="btn_hybrid_search"):
+        if st.button("Search with Hybrid Approach"):
             # Check if at least one search criterion is provided
             if hybrid_text.strip() or hybrid_file is not None:
                 with st.spinner("Searching with hybrid approach..."):
@@ -419,7 +432,7 @@ def main():
             "Enter your question or instructions",
             value="What kind of jacket is this? Describe the style, materials, and suggest occasions where it would be appropriate to wear it.",
             height=100,
-            key="gemini_text_query"
+            key="gemini_text_area"
         )
         
         # Image upload
@@ -428,7 +441,7 @@ def main():
         # Option to use a URL for the image
         gemini_image_url = st.text_input("Or enter an image URL", key="gemini_image_url")
         
-        if st.button("Get Gemini Insights", key="btn_gemini_insights"):
+        if st.button("Get Gemini Insights", key="gemini_insights_button"):
             image = None
             
             # Get image from file or URL
@@ -450,7 +463,7 @@ def main():
                     st.markdown(insights)
                     
                     # Prompt for product search
-                    if st.button("Find similar products based on these insights", key="btn_find_similar"):
+                    if st.button("Find similar products based on these insights", key="find_similar_button"):
                         # Extract key terms from insights for search
                         search_query = insights.split(".")[0]  # Use first sentence as query
                         

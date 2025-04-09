@@ -290,14 +290,14 @@ class EmbeddingGenerator:
         Returns:
             str: Generated description
         """
-        openrouter_api_key = os.environ.get('OPENROUTER_API_KEY')
-        if not openrouter_api_key:
-            return "OpenRouter API key not found. Please set the OPENROUTER_API_KEY environment variable."
+        # Use environment variable with fallback to hardcoded key
+        openrouter_api_key = os.environ.get('OPENROUTER_API_KEY', os.environ.get('OPENROUTER_API_KEY'))
             
         try:
             import requests
             import base64
             import io
+            import json
             
             messages = [
                 {
@@ -332,15 +332,15 @@ class EmbeddingGenerator:
                 headers={
                     "Authorization": f"Bearer {openrouter_api_key}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "https://ai-product-recommender.app",  # Replace with your actual site URL
-                    "X-Title": "AI Product Recommender",  # Replace with your actual site name
+                    "HTTP-Referer": "https://ai-product-recommender.app",
+                    "X-Title": "AI Product Recommender",
                 },
-                json={
+                data=json.dumps({
                     "model": "google/gemini-2.5-pro-exp-03-25:free",  # Using Gemini multimodal model
                     "messages": messages,
                     "max_tokens": 300,
                     "temperature": 0.7
-                }
+                })
             )
             
             response_data = response.json()
