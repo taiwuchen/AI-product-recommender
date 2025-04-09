@@ -6,6 +6,9 @@ streamlit
 faiss-cpu
 google-cloud-aiplatform
 tensorflow
+tensorflow_hub
 scikit-learn
 python-dotenv
 requests
+certifi
+urllib3
