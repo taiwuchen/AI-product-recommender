@@ -15,7 +15,9 @@ os.environ['OPENROUTER_API_KEY'] = os.environ.get('OPENROUTER_API_KEY')
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.data_loader import ProductDataLoader
-from models.embeddings import EmbeddingGenerator, fix_certificate_verification
+from models.base_embedding import fix_certificate_verification
+from models.text_embedding import TextEmbeddingGenerator
+from models.image_embedding import ImageEmbeddingGenerator
 from models.vector_db import VectorDatabase
 
 # Fix SSL certificates at the start of the application
@@ -26,8 +28,6 @@ DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path
                          'ZARA_jackets_men.csv')
 INDEXES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'indexes')
 GOOGLE_CREDENTIALS_PATH = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-# Fixed to us-west2 which we know is supported
-VERTEX_AI_REGION = "us-west2"
 
 # Set up page configuration
 st.set_page_config(
@@ -44,15 +44,20 @@ def load_data():
 
 @st.cache_resource
 def initialize_models():
-    """Initialize the embedding generator and vector database."""
-    embedding_generator = EmbeddingGenerator(
-        google_credentials_path=GOOGLE_CREDENTIALS_PATH,
-        vertex_ai_region=VERTEX_AI_REGION
+    """Initialize the embedding generators and vector database."""
+    # Create separate text and image embedding generators
+    text_embedding_generator = TextEmbeddingGenerator(
+        google_credentials_path=GOOGLE_CREDENTIALS_PATH
     )
+    
+    image_embedding_generator = ImageEmbeddingGenerator(
+        google_credentials_path=GOOGLE_CREDENTIALS_PATH
+    )
+    
     vector_db = VectorDatabase()
-    return embedding_generator, vector_db
+    return text_embedding_generator, image_embedding_generator, vector_db
 
-def build_or_load_indexes(df, embedding_generator, vector_db):
+def build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db):
     """Build or load vector indexes."""
     # Check if indexes already exist
     if os.path.exists(os.path.join(INDEXES_DIR, 'text_index.faiss')) and \
@@ -63,10 +68,10 @@ def build_or_load_indexes(df, embedding_generator, vector_db):
     else:
         with st.spinner('Building indexes. This may take a while...'):
             # Generate text embeddings
-            text_embeddings = embedding_generator.generate_batch_text_embeddings(df['text_for_embedding'].tolist())
+            text_embeddings = text_embedding_generator.generate_batch_text_embeddings(df['text_for_embedding'].tolist())
             
             # Generate image embeddings
-            image_embeddings = embedding_generator.generate_batch_image_embeddings(df['first_image_url'].tolist())
+            image_embeddings = image_embedding_generator.generate_batch_image_embeddings(df['first_image_url'].tolist())
             
             # Add embeddings to vector db
             vector_db.add_text_embeddings(text_embeddings, list(range(len(df))))
@@ -296,10 +301,10 @@ def main():
     
     # Load data and models
     df, loader = load_data()
-    embedding_generator, vector_db = initialize_models()
+    text_embedding_generator, image_embedding_generator, vector_db = initialize_models()
     
     # Build or load indexes
-    build_or_load_indexes(df, embedding_generator, vector_db)
+    build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db)
     
     # Create tabs for different search modes
     tab1, tab2, tab3, tab4 = st.tabs(["Text Search", "Image Search", "Hybrid Search", "Gemini Insights"])
@@ -312,7 +317,7 @@ def main():
             if text_query.strip():
                 with st.spinner("Searching..."):
                     # Generate text embedding for the query
-                    query_embedding = embedding_generator.generate_text_embedding(text_query)
+                    query_embedding = text_embedding_generator.generate_text_embedding(text_query)
                     
                     # Search by text
                     distances, indices = vector_db.search_by_text(query_embedding, k=5)
@@ -350,10 +355,10 @@ def main():
             if image:
                 with st.spinner("Analyzing image and searching for similar products..."):
                     # Preprocess image
-                    img_array = embedding_generator.preprocess_image(image)
+                    img_array = image_embedding_generator.preprocess_image(image)
                     
                     # Generate image embedding
-                    query_embedding = embedding_generator.image_model.predict(img_array)[0]
+                    query_embedding = image_embedding_generator.image_model.predict(img_array)[0]
                     
                     # Search by image
                     distances, indices = vector_db.search_by_image(query_embedding, k=5)
@@ -393,13 +398,13 @@ def main():
                     
                     # Generate text embedding if text provided
                     if hybrid_text.strip():
-                        text_embedding = embedding_generator.generate_text_embedding(hybrid_text)
+                        text_embedding = text_embedding_generator.generate_text_embedding(hybrid_text)
                     
                     # Generate image embedding if image provided
                     if hybrid_file is not None:
                         image = Image.open(hybrid_file)
-                        img_array = embedding_generator.preprocess_image(image)
-                        image_embedding = embedding_generator.image_model.predict(img_array)[0]
+                        img_array = image_embedding_generator.preprocess_image(image)
+                        image_embedding = image_embedding_generator.image_model.predict(img_array)[0]
                     
                     # Perform hybrid search
                     indices = vector_db.hybrid_search(
@@ -456,7 +461,7 @@ def main():
             if gemini_text.strip() and image is not None:
                 with st.spinner("Generating insights from Gemini..."):
                     # Use the multimodal model to generate insights
-                    insights = embedding_generator.generate_multimodal_description(gemini_text, image)
+                    insights = text_embedding_generator.generate_multimodal_description(gemini_text, image)
                     
                     # Display the results
                     st.subheader("Gemini's Insights")
@@ -469,7 +474,7 @@ def main():
                         
                         with st.spinner("Searching for similar products..."):
                             # Generate text embedding for the query
-                            query_embedding = embedding_generator.generate_text_embedding(search_query)
+                            query_embedding = text_embedding_generator.generate_text_embedding(search_query)
                             
                             # Search by text
                             distances, indices = vector_db.search_by_text(query_embedding, k=5)
