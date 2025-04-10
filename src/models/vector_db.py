@@ -52,6 +52,12 @@ class VectorDatabase:
             self.dimension_text = embeddings.shape[1]
             self.index_text = faiss.IndexFlatL2(self.dimension_text)
             print(f"Created new text index with dimension {self.dimension_text}")
+        elif len(self.product_ids) > 0:
+            # If there are already product IDs, we're adding to an existing index
+            # Reset the index to start fresh
+            print(f"Resetting text index to avoid duplicates. Old size: {self.index_text.ntotal}")
+            self.index_text = faiss.IndexFlatL2(self.dimension_text)
+            self.product_ids = []
             
         # Add to index
         self.index_text.add(embeddings)
@@ -78,6 +84,10 @@ class VectorDatabase:
             self.dimension_image = embeddings.shape[1]
             self.index_image = faiss.IndexFlatL2(self.dimension_image)
             print(f"Created new image index with dimension {self.dimension_image}")
+        elif self.index_image.ntotal > 0:
+            # If there are already vectors in the index, reset it to start fresh
+            print(f"Resetting image index to avoid duplicates. Old size: {self.index_image.ntotal}")
+            self.index_image = faiss.IndexFlatL2(self.dimension_image)
             
         # Add to index
         self.index_image.add(embeddings)
