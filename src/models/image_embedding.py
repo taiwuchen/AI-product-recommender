@@ -1,64 +1,63 @@
 import numpy as np
-import tensorflow as tf
+import torch
 import urllib.parse
 import requests
 from PIL import Image
 from io import BytesIO
-import base64
 from typing import List, Optional
-from google.cloud import aiplatform
+from transformers import CLIPProcessor, CLIPModel
 
 from .base_embedding import BaseEmbeddingGenerator
 
 
 class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
     """
-    Class to generate image embeddings using Google Vertex AI or TensorFlow.
+    Class to generate image embeddings using OpenAI's CLIP model.
+    This provides multimodal embeddings that align images and text in the same vector space.
     """
     
-    def __init__(self, google_credentials_path: Optional[str] = None, vertex_ai_region: Optional[str] = None):
+    def __init__(self, 
+                 google_credentials_path: Optional[str] = None, 
+                 vertex_ai_region: Optional[str] = None,
+                 clip_model_name: str = "openai/clip-vit-base-patch32"):
         """
-        Initialize the image embedding generator.
+        Initialize the CLIP image embedding generator.
         
         Args:
             google_credentials_path (str, optional): Path to Google Cloud service account credentials.
+                Not used for CLIP, but kept for compatibility with base class.
             vertex_ai_region (str, optional): Google Cloud region for Vertex AI.
+                Not used for CLIP, but kept for compatibility with base class.
+            clip_model_name (str): Name of the CLIP model to use.
         """
         super().__init__(google_credentials_path, vertex_ai_region)
-        self._load_image_model()
-        
-        # Initialize Vertex AI Image Embeddings API client
-        if self.initialized:
-            try:
-                # Initialize the Vertex AI Embedding API client
-                self.image_embedding_client = aiplatform.ImageEmbeddingModel.from_pretrained("imageembedding-gecko@latest")
-                print("Vertex AI Image-Embeddings API initialized successfully")
-            except Exception as e:
-                print(f"Warning: Failed to initialize Vertex AI Image-Embeddings API: {e}")
-                self.image_embedding_client = None
-        else:
-            self.image_embedding_client = None
+        self.clip_model_name = clip_model_name
+        self._load_clip_model()
     
-    def _load_image_model(self):
-        """Load TensorFlow model for image embeddings as fallback."""
+    def _load_clip_model(self):
+        """Load the CLIP model and processor."""
         try:
-            print("Loading image embedding model...")
+            print(f"Loading CLIP model: {self.clip_model_name}...")
             
-            # Use MobileNetV2 for image embeddings
-            base_model = tf.keras.applications.MobileNetV2(
-                include_top=False, weights='imagenet', input_shape=(224, 224, 3)
-            )
-            self.image_model = tf.keras.Model(
-                inputs=base_model.input,
-                outputs=tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
-            )
-            print("Image embedding model loaded successfully")
+            # Load the CLIP model and processor
+            self.clip_processor = CLIPProcessor.from_pretrained(self.clip_model_name)
+            self.clip_model = CLIPModel.from_pretrained(self.clip_model_name)
+            
+            # Check if CUDA is available and move model to GPU if possible
+            if torch.cuda.is_available():
+                self.clip_model = self.clip_model.to("cuda")
+                self.device = "cuda"
+                print("CLIP model loaded on GPU")
+            else:
+                self.device = "cpu"
+                print("CLIP model loaded on CPU")
+                
         except Exception as e:
-            print(f"Warning: Failed to load image embedding model: {e}")
-            print("Using random image embeddings as fallback")
-            self.image_model = None
+            print(f"Warning: Failed to load CLIP model: {e}")
+            self.clip_processor = None
+            self.clip_model = None
     
-    def download_image(self, image_url: str) -> Image.Image:
+    def download_image(self, image_url: str) -> Optional[Image.Image]:
         """
         Download an image from a URL.
         
@@ -66,13 +65,13 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
             image_url (str): URL of the image.
             
         Returns:
-            Image.Image: PIL Image object.
+            Optional[Image.Image]: PIL Image object or None if download fails.
         """
         try:
             # Check if URL is valid before making a request
             if not image_url or not isinstance(image_url, str):
                 print(f"Invalid URL: {image_url}")
-                return Image.new('RGB', (224, 224), color='white')
+                return None
                 
             # Parse and validate URL
             parsed = urllib.parse.urlparse(image_url)
@@ -82,7 +81,7 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
                     image_url = f"https://{image_url}"
                 else:
                     print(f"Invalid URL '{image_url}': No scheme or host provided")
-                    return Image.new('RGB', (224, 224), color='white')
+                    return None
                     
             # Add headers to mimic a browser request
             headers = {
@@ -90,7 +89,7 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
                 'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
                 'Accept-Encoding': 'gzip, deflate, br',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Referer': 'https://www.zara.com/'
+                'Referer': 'https://www.google.com/'
             }
             
             # Download the image
@@ -99,34 +98,33 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
             return Image.open(BytesIO(response.content)).convert('RGB')
         except Exception as e:
             print(f"Error downloading image from {image_url}: {e}")
-            # Return a blank image as fallback
-            return Image.new('RGB', (224, 224), color='white')
+            return None
     
-    def preprocess_image(self, image: Image.Image) -> np.ndarray:
+    def preprocess_image(self, image: Image.Image) -> dict:
         """
-        Preprocess image for the model.
+        Preprocess image for the CLIP model.
         
         Args:
             image (Image.Image): PIL Image object.
             
         Returns:
-            np.ndarray: Preprocessed image array.
+            dict: Processed image inputs for the model.
         """
-        # Resize the image to the required dimensions
-        image = image.resize((224, 224))
+        if self.clip_processor is None:
+            raise ValueError("CLIP processor not initialized")
+            
+        # Process image using CLIP processor
+        inputs = self.clip_processor(images=image, return_tensors="pt")
         
-        # Convert to numpy array and normalize
-        img_array = np.array(image) / 255.0
-        img_array = img_array.astype(np.float32)
-        
-        # Add batch dimension
-        img_array = np.expand_dims(img_array, axis=0)
-        
-        return img_array
+        # Move inputs to the same device as the model
+        if hasattr(self, 'device'):
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            
+        return inputs
     
     def generate_image_embedding(self, image_url: str) -> np.ndarray:
         """
-        Generate embedding for an image using Google Vertex AI or TensorFlow model.
+        Generate embedding for an image.
         
         Args:
             image_url (str): URL of the image.
@@ -135,23 +133,49 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
             np.ndarray: Image embedding vector.
         """
         try:
-            # Download and preprocess the image
+            # Download the image
             image = self.download_image(image_url)
             
-            if self.initialized and self.image_embedding_client:
-                # Use Vertex AI Image Embeddings API
-                return self.generate_embedding_from_pil_image(image)
-            elif self.image_model:
-                # Use TensorFlow model as fallback
-                img_array = self.preprocess_image(image)
-                embedding = self.image_model.predict(img_array)[0]
-                return embedding
-            else:
-                raise ValueError("No image embedding model available")
+            if image is None:
+                raise ValueError(f"Failed to download image from {image_url}")
+                
+            # Generate embedding from the image
+            return self.generate_embedding_from_pil_image(image)
         except Exception as e:
             print(f"Error generating image embedding: {e}")
             # Return a random embedding as a last resort
-            return np.random.randn(1280).astype(np.float32)
+            return np.random.randn(512).astype(np.float32)
+    
+    def generate_embedding_from_pil_image(self, image: Image.Image) -> np.ndarray:
+        """
+        Generate embedding directly from a PIL image object.
+        
+        Args:
+            image (Image.Image): PIL Image object.
+            
+        Returns:
+            np.ndarray: Image embedding vector.
+        """
+        try:
+            if self.clip_model is None or self.clip_processor is None:
+                raise ValueError("CLIP model or processor not initialized")
+                
+            # Preprocess the image
+            inputs = self.preprocess_image(image)
+            
+            # Generate embedding
+            with torch.no_grad():
+                image_features = self.clip_model.get_image_features(**inputs)
+                
+            # Normalize the embedding
+            image_embeddings = image_features / image_features.norm(dim=1, keepdim=True)
+            
+            # Convert to numpy array and return
+            return image_embeddings.cpu().numpy()[0]
+        except Exception as e:
+            print(f"Error generating CLIP image embedding: {e}")
+            # Return a random embedding as a last resort
+            return np.random.randn(512).astype(np.float32)
     
     def generate_batch_image_embeddings(self, image_urls: List[str]) -> np.ndarray:
         """
@@ -167,59 +191,78 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
             return np.array([])
             
         embeddings = []
+        valid_count = 0
         
-        # Process in smaller batches if using Vertex AI to avoid overwhelming the API
-        if self.initialized and self.image_embedding_client:
-            batch_size = 16  # Smaller batch size for image processing
-            
-            for i in range(0, len(image_urls), batch_size):
-                batch_urls = image_urls[i:i+batch_size]
-                batch_images = [self.download_image(url) for url in batch_urls]
+        for i, url in enumerate(image_urls):
+            if not url or not isinstance(url, str) or url.strip() == "":
+                # For empty URLs, just add a random embedding to maintain alignment
+                print(f"Skipping empty URL at index {i}")
+                embeddings.append(np.random.randn(512).astype(np.float32))
+                continue
                 
-                for image in batch_images:
-                    embedding = self.generate_embedding_from_pil_image(image)
-                    embeddings.append(embedding)
-        else:
-            # Standard sequential processing with TensorFlow model
-            for url in image_urls:
+            try:
                 embedding = self.generate_image_embedding(url)
                 embeddings.append(embedding)
+                valid_count += 1
+                if valid_count % 10 == 0:
+                    print(f"Generated {valid_count} valid embeddings out of {i+1} processed URLs")
+            except Exception as e:
+                print(f"Error processing image from URL at index {i}: {e}")
+                # Add a random embedding to maintain alignment with input
+                embeddings.append(np.random.randn(512).astype(np.float32))
         
+        print(f"Completed batch processing: {valid_count} valid embeddings out of {len(image_urls)} URLs")
         return np.array(embeddings)
     
-    def generate_embedding_from_pil_image(self, image: Image.Image) -> np.ndarray:
+    def generate_text_embedding(self, text: str) -> np.ndarray:
         """
-        Generate embedding directly from a PIL image object.
+        Generate embedding for text using CLIP's text encoder.
         
         Args:
-            image (Image.Image): PIL Image object.
+            text (str): Text to embed.
             
         Returns:
-            np.ndarray: Image embedding vector.
+            np.ndarray: Text embedding vector.
         """
         try:
-            if self.initialized and self.image_embedding_client:
-                # Use Vertex AI Image Embeddings API
-                # Convert image to format expected by Vertex AI
-                buffer = BytesIO()
-                image.save(buffer, format="JPEG")
-                image_bytes = buffer.getvalue()
+            if self.clip_model is None or self.clip_processor is None:
+                raise ValueError("CLIP model or processor not initialized")
                 
-                # Get embedding from Vertex AI
-                embeddings = self.image_embedding_client.get_embeddings([image_bytes])
-                if embeddings and embeddings[0] is not None:
-                    return np.array(embeddings[0])
-                else:
-                    raise ValueError("Empty embedding response from Vertex AI")
-            elif self.image_model:
-                # Use TensorFlow model as fallback
-                img_array = self.preprocess_image(image)
-                embedding = self.image_model.predict(img_array)[0]
-                return embedding
-            else:
-                # Last resort fallback
-                raise ValueError("No image embedding model available")
+            # Process text using CLIP processor
+            inputs = self.clip_processor(text=text, return_tensors="pt", padding=True, truncation=True)
+            
+            # Move inputs to the same device as the model
+            if hasattr(self, 'device'):
+                inputs = {k: v.to(self.device) for k, v in inputs.items() if k != 'pixel_values'}
+            
+            # Generate embedding
+            with torch.no_grad():
+                text_features = self.clip_model.get_text_features(**inputs)
+                
+            # Normalize the embedding
+            text_embeddings = text_features / text_features.norm(dim=1, keepdim=True)
+            
+            # Convert to numpy array and return
+            return text_embeddings.cpu().numpy()[0]
         except Exception as e:
-            print(f"Error generating image embedding: {e}")
+            print(f"Error generating CLIP text embedding: {e}")
             # Return a random embedding as a last resort
-            return np.random.randn(1280).astype(np.float32)
+            return np.random.randn(512).astype(np.float32)
+    
+    def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
+        """
+        Compute cosine similarity between two embeddings.
+        
+        Args:
+            embedding1 (np.ndarray): First embedding vector.
+            embedding2 (np.ndarray): Second embedding vector.
+            
+        Returns:
+            float: Cosine similarity score between 0 and 1.
+        """
+        # Ensure embeddings are normalized
+        embedding1 = embedding1 / np.linalg.norm(embedding1)
+        embedding2 = embedding2 / np.linalg.norm(embedding2)
+        
+        # Compute cosine similarity
+        return float(np.dot(embedding1, embedding2))

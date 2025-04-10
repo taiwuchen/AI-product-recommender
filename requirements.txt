@@ -12,3 +12,6 @@ python-dotenv
 requests
 certifi
 urllib3
+# Added dependencies for CLIP
+torch
+transformers
