@@ -4,6 +4,7 @@ import urllib.parse
 import requests
 from PIL import Image
 from io import BytesIO
+import base64
 from typing import List, Optional
 from google.cloud import aiplatform
 
@@ -25,6 +26,18 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
         """
         super().__init__(google_credentials_path, vertex_ai_region)
         self._load_image_model()
+        
+        # Initialize Vertex AI Image Embeddings API client
+        if self.initialized:
+            try:
+                # Initialize the Vertex AI Embedding API client
+                self.image_embedding_client = aiplatform.ImageEmbeddingModel.from_pretrained("imageembedding-gecko@latest")
+                print("Vertex AI Image-Embeddings API initialized successfully")
+            except Exception as e:
+                print(f"Warning: Failed to initialize Vertex AI Image-Embeddings API: {e}")
+                self.image_embedding_client = None
+        else:
+            self.image_embedding_client = None
     
     def _load_image_model(self):
         """Load TensorFlow model for image embeddings as fallback."""
@@ -124,23 +137,17 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
         try:
             # Download and preprocess the image
             image = self.download_image(image_url)
-            img_array = self.preprocess_image(image)
             
-            if self.initialized:
-                # Use Google Vertex AI
-                # Convert to bytes for API
-                image_bytes = BytesIO()
-                image.save(image_bytes, format='JPEG')
-                img_bytes = image_bytes.getvalue()
-                
-                endpoint = aiplatform.Endpoint("projects/{project}/locations/{location}/endpoints/{id}")
-                response = endpoint.predict(instances=[{"bytes_inputs": {"b64": img_bytes}}])
-                embedding = np.array(response.predictions[0])
-                return embedding
-            else:
+            if self.initialized and self.image_embedding_client:
+                # Use Vertex AI Image Embeddings API
+                return self.generate_embedding_from_pil_image(image)
+            elif self.image_model:
                 # Use TensorFlow model as fallback
+                img_array = self.preprocess_image(image)
                 embedding = self.image_model.predict(img_array)[0]
                 return embedding
+            else:
+                raise ValueError("No image embedding model available")
         except Exception as e:
             print(f"Error generating image embedding: {e}")
             # Return a random embedding as a last resort
@@ -156,10 +163,27 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
         Returns:
             np.ndarray: Array of image embedding vectors.
         """
+        if not image_urls:
+            return np.array([])
+            
         embeddings = []
-        for url in image_urls:
-            embedding = self.generate_image_embedding(url)
-            embeddings.append(embedding)
+        
+        # Process in smaller batches if using Vertex AI to avoid overwhelming the API
+        if self.initialized and self.image_embedding_client:
+            batch_size = 16  # Smaller batch size for image processing
+            
+            for i in range(0, len(image_urls), batch_size):
+                batch_urls = image_urls[i:i+batch_size]
+                batch_images = [self.download_image(url) for url in batch_urls]
+                
+                for image in batch_images:
+                    embedding = self.generate_embedding_from_pil_image(image)
+                    embeddings.append(embedding)
+        else:
+            # Standard sequential processing with TensorFlow model
+            for url in image_urls:
+                embedding = self.generate_image_embedding(url)
+                embeddings.append(embedding)
         
         return np.array(embeddings)
     
@@ -174,23 +198,27 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
             np.ndarray: Image embedding vector.
         """
         try:
-            img_array = self.preprocess_image(image)
-            
-            if self.initialized:
-                # Use Google Vertex AI
-                # Convert to bytes for API
-                image_bytes = BytesIO()
-                image.save(image_bytes, format='JPEG')
-                img_bytes = image_bytes.getvalue()
+            if self.initialized and self.image_embedding_client:
+                # Use Vertex AI Image Embeddings API
+                # Convert image to format expected by Vertex AI
+                buffer = BytesIO()
+                image.save(buffer, format="JPEG")
+                image_bytes = buffer.getvalue()
                 
-                endpoint = aiplatform.Endpoint("projects/{project}/locations/{location}/endpoints/{id}")
-                response = endpoint.predict(instances=[{"bytes_inputs": {"b64": img_bytes}}])
-                embedding = np.array(response.predictions[0])
-                return embedding
-            else:
+                # Get embedding from Vertex AI
+                embeddings = self.image_embedding_client.get_embeddings([image_bytes])
+                if embeddings and embeddings[0] is not None:
+                    return np.array(embeddings[0])
+                else:
+                    raise ValueError("Empty embedding response from Vertex AI")
+            elif self.image_model:
                 # Use TensorFlow model as fallback
+                img_array = self.preprocess_image(image)
                 embedding = self.image_model.predict(img_array)[0]
                 return embedding
+            else:
+                # Last resort fallback
+                raise ValueError("No image embedding model available")
         except Exception as e:
             print(f"Error generating image embedding: {e}")
             # Return a random embedding as a last resort

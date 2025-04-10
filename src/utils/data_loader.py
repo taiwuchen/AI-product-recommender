@@ -10,32 +10,14 @@ class ProductDataLoader:
     """
     
     def __init__(self, data_path: str):
-        """
-        Initialize the data loader.
-        
-        Args:
-            data_path (str): Path to the CSV file containing product data.
-        """
         self.data_path = data_path
         self.df = None
         
     def load_data(self) -> pd.DataFrame:
-        """
-        Load the data from CSV file.
-        
-        Returns:
-            pd.DataFrame: DataFrame containing the product data.
-        """
         self.df = pd.read_csv(self.data_path)
         return self.df
     
     def preprocess_data(self) -> pd.DataFrame:
-        """
-        Preprocess the data for embedding generation.
-        
-        Returns:
-            pd.DataFrame: Preprocessed DataFrame.
-        """
         if self.df is None:
             self.load_data()
         
@@ -48,15 +30,6 @@ class ProductDataLoader:
         return self.df
     
     def _extract_first_image_url(self, image_data_str: str) -> str:
-        """
-        Extract the first image URL from the product_images column.
-        
-        Args:
-            image_data_str (str): String representation of image data.
-            
-        Returns:
-            str: First image URL or empty string if extraction fails.
-        """
         try:
             # Convert string representation of list to actual list
             image_data = ast.literal_eval(image_data_str)
@@ -71,15 +44,6 @@ class ProductDataLoader:
             return ""
     
     def get_product_details(self, product_indices: List[int]) -> List[Dict]:
-        """
-        Get details for a list of product indices.
-        
-        Args:
-            product_indices (List[int]): List of product indices.
-            
-        Returns:
-            List[Dict]: List of dictionaries with product details.
-        """
         if self.df is None:
             self.preprocess_data()
             

@@ -26,8 +26,8 @@ class EmbeddingGenerator:
         self.text_generator = TextEmbeddingGenerator(google_credentials_path, vertex_ai_region)
         self.image_generator = ImageEmbeddingGenerator(google_credentials_path, vertex_ai_region)
         
-        # For backward compatibility
-        self.text_model = self.text_generator.text_model
+        # For backward compatibility - handle the case where text_model no longer exists
+        self.text_model = getattr(self.text_generator, 'text_embedding_model', None)
         self.image_model = self.image_generator.image_model
         self.initialized = self.text_generator.initialized
     
