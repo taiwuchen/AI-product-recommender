@@ -1,38 +1,13 @@
 import os
-import ssl
-import requests
 from typing import Optional
 from dotenv import load_dotenv
 from google.cloud import aiplatform
 from google.oauth2 import service_account
 
-
-# Fix SSL certificate verification on macOS
-def fix_certificate_verification():
-    """Fix SSL certificate verification issues on macOS"""
-    try:
-        # Use certifi if available
-        import certifi
-        os.environ['SSL_CERT_FILE'] = certifi.where()
-        
-        # For macOS, run the certificate install command for Python
-        if os.path.exists('/Applications/Python 3.10/Install Certificates.command'):
-            import subprocess
-            subprocess.run(['/Applications/Python 3.10/Install Certificates.command'], check=False, shell=True)
-        
-        # Create unverified HTTPS context if needed
-        ssl._create_default_https_context = ssl._create_unverified_context
-    except Exception as e:
-        print(f"Warning: Could not fix SSL certificate verification: {e}")
-
-
 class BaseEmbeddingGenerator:
     
     def __init__(self, google_credentials_path: Optional[str] = None, vertex_ai_region: Optional[str] = None):
         load_dotenv()
-        
-        # Fix SSL certificate issues before making any requests
-        fix_certificate_verification()
         
         # Initialize Google Cloud credentials
         self.credentials = None

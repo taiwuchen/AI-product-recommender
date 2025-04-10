@@ -11,13 +11,9 @@ from typing import List, Dict, Optional
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.data_loader import ProductDataLoader
-from models.base_embedding import fix_certificate_verification
 from models.text_embedding import TextEmbeddingGenerator
 from models.image_embedding import ImageEmbeddingGenerator
 from models.vector_db import VectorDatabase
-
-# Fix SSL certificates at the start of the application
-fix_certificate_verification()
 
 # Constants
 DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
