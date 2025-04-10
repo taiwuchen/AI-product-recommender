@@ -7,22 +7,19 @@ from io import BytesIO
 from typing import List, Optional, Dict
 from transformers import CLIPProcessor, CLIPModel
 
-from .base_embedding import BaseEmbeddingGenerator
-
 # Set fixed random seeds for reproducibility
 np.random.seed(42)
 torch.manual_seed(42)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(42)
 
-class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
+class ImageEmbeddingGenerator:
     
     def __init__(self, 
                  google_credentials_path: Optional[str] = None, 
                  vertex_ai_region: Optional[str] = None,
                  clip_model_name: str = "openai/clip-vit-base-patch32"):
 
-        super().__init__(google_credentials_path, vertex_ai_region)
         self.clip_model_name = clip_model_name
         self._load_clip_model()
         
