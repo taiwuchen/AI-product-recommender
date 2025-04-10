@@ -15,7 +15,7 @@ class VectorDatabase:
         Initialize the vector database.
         
         Args:
-            dimension_text (int): Dimension of text embeddings (default is 768 for Vertex AI).
+            dimension_text (int): Dimension of text embeddings (default is 768 for text-embedding-005).
             dimension_image (int): Dimension of image embeddings.
         """
         self.dimension_text = dimension_text
@@ -97,6 +97,16 @@ class VectorDatabase:
         Returns:
             Tuple[np.ndarray, np.ndarray]: Tuple of (distances, indices).
         """
+        # Check if index is empty
+        if self.index_text.ntotal == 0:
+            print("WARNING: Text index is empty. No results can be returned.")
+            return np.array([[0.0] * k]), np.array([[0] * k])
+            
+        # Check product_ids also exists
+        if not self.product_ids:
+            print("WARNING: Product IDs list is empty. No results can be returned.")
+            return np.array([[0.0] * k]), np.array([[0] * k])
+            
         # Check if the embedding dimension matches the index
         if query_embedding.shape[0] != self.dimension_text:
             print(f"Warning: Query embedding dimension mismatch. Expected {self.dimension_text}, got {query_embedding.shape[0]}.")
@@ -109,18 +119,38 @@ class VectorDatabase:
         # Get more results than needed for filtering
         search_k = min(k * 3, len(self.product_ids)) if keyword_boost and query_text else k
         
+        # Safety check
+        if search_k <= 0:
+            search_k = 1
+            
+        print(f"Searching in index with {self.index_text.ntotal} items for top {search_k} results")
+        print(f"Query norm: {np.linalg.norm(query_embedding):.4f}")
+        
         # Search index
         distances, indices = self.index_text.search(query_embedding, search_k)
+        
+        # Print detailed information about each result to help with debugging
+        print(f"\nRaw search results:")
+        for i, idx in enumerate(indices[0]):
+            if i < 5:  # Print top 5 results
+                if idx < len(self.product_texts):
+                    product_text = self.product_texts[idx][:100] + "..." if len(self.product_texts[idx]) > 100 else self.product_texts[idx]
+                    print(f"  {i+1}. ID={idx}, Distance={distances[0][i]:.4f}, Text: {product_text}")
+                else:
+                    print(f"  {i+1}. ID={idx}, Distance={distances[0][i]:.4f}, Text: <out of range>")
         
         if keyword_boost and query_text and len(self.product_texts) > 0:
             # Extract important keywords from query (simple approach)
             keywords = [kw.lower() for kw in query_text.split() if len(kw) > 2]
+            
+            print(f"\nKeywords for boosting: {keywords}")
             
             if keywords:
                 # Score based on keyword presence
                 keyword_scores = {}
                 for i, idx in enumerate(indices[0]):
                     if idx >= len(self.product_texts):
+                        print(f"WARNING: Index {idx} out of range for product_texts (length: {len(self.product_texts)})")
                         continue
                         
                     text = self.product_texts[idx].lower()
@@ -134,6 +164,7 @@ class VectorDatabase:
                         score *= (1.0 + 0.5 * keyword_matches)
                         
                     keyword_scores[idx] = score
+                    print(f"  Product {idx} - Keywords matches: {keyword_matches}, Score: {score:.4f}")
                     
                 # Sort by new scores
                 if keyword_scores:
@@ -143,10 +174,20 @@ class VectorDatabase:
                     new_indices = np.array([[idx for idx, _ in sorted_results]])
                     new_distances = np.array([[1.0 - score for _, score in sorted_results]])
                     
+                    print(f"\nBoosted search results:")
+                    for i, (idx, score) in enumerate(sorted_results):
+                        if idx < len(self.product_texts):
+                            product_text = self.product_texts[idx][:100] + "..." if len(self.product_texts[idx]) > 100 else self.product_texts[idx]
+                            print(f"  {i+1}. ID={idx}, Score={score:.4f}, Text: {product_text}")
+                        else:
+                            print(f"  {i+1}. ID={idx}, Score={score:.4f}, Text: <out of range>")
+                    
                     return new_distances, new_indices
         
         # Return original results if no keyword boosting or no keywords found
-        return distances, indices[:, :k]
+        result_k = min(k, indices.shape[1])
+        print(f"\nReturning {result_k} raw search results")
+        return distances, indices[:, :result_k]
     
     def search_by_image(self, query_embedding: np.ndarray, k: int = 5) -> Tuple[np.ndarray, np.ndarray]:
         """

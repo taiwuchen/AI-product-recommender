@@ -55,38 +55,56 @@ def initialize_models():
 
 def build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db):
     """Build or load vector indexes."""
-    # Check if indexes already exist
-    if os.path.exists(os.path.join(INDEXES_DIR, 'text_index.faiss')) and \
-       os.path.exists(os.path.join(INDEXES_DIR, 'image_index.faiss')):
-        with st.spinner('Loading existing indexes...'):
-            vector_db.load_indices(INDEXES_DIR)
-            
-            # If product_texts is empty, we need to store them (backward compatibility)
-            if not vector_db.product_texts:
-                vector_db.set_product_texts(df['text_for_embedding'].tolist())
-                # Save updated indices with product_texts
-                vector_db.save_indices(INDEXES_DIR)
-                
-            st.success('Indexes loaded successfully!')
-    else:
-        with st.spinner('Building indexes. This may take a while...'):
+    
+    # Delete existing indexes to force rebuild
+    import shutil
+    if os.path.exists(INDEXES_DIR):
+        print(f"Deleting existing indexes in {INDEXES_DIR}")
+        try:
+            # Delete all files in directory without removing directory
+            for file_name in os.listdir(INDEXES_DIR):
+                file_path = os.path.join(INDEXES_DIR, file_name)
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+            print("Existing indexes deleted successfully")
+        except Exception as e:
+            print(f"Error deleting indexes: {e}")
+    
+    # Create indexes directory if it doesn't exist
+    os.makedirs(INDEXES_DIR, exist_ok=True)
+    
+    with st.spinner('Building indexes. This may take a while...'):
+        try:
+            print("Building new indexes")
             # Generate text embeddings
+            print(f"Generating text embeddings for {len(df)} products")
             text_embeddings = text_embedding_generator.generate_batch_text_embeddings(df['text_for_embedding'].tolist())
+            print(f"Generated text embeddings shape: {text_embeddings.shape}")
             
             # Generate image embeddings
+            print(f"Generating image embeddings for {len(df)} products")
             image_embeddings = image_embedding_generator.generate_batch_image_embeddings(df['first_image_url'].tolist())
+            print(f"Generated image embeddings shape: {image_embeddings.shape}")
             
             # Add embeddings to vector db
+            print("Adding text embeddings to vector DB")
             vector_db.add_text_embeddings(text_embeddings, list(range(len(df))))
+            print("Adding image embeddings to vector DB")
             vector_db.add_image_embeddings(image_embeddings, list(range(len(df))))
             
             # Store original text data for keyword filtering
+            print("Setting product texts")
             vector_db.set_product_texts(df['text_for_embedding'].tolist())
             
+            print(f"Final vector DB index stats: {vector_db.index_text.ntotal} text vectors, {len(vector_db.product_texts)} product texts")
+            
             # Save indexes
-            os.makedirs(INDEXES_DIR, exist_ok=True)
+            print(f"Saving indexes to {INDEXES_DIR}")
             vector_db.save_indices(INDEXES_DIR)
             st.success('Indexes built and saved successfully!')
+        except Exception as e:
+            st.error(f"Failed to build indexes: {e}")
+            raise RuntimeError(f"Index building failed: {e}")
 
 def generate_product_description(products: List[Dict], query: Optional[str] = None):
     """Generate a description for product recommendations."""
@@ -213,12 +231,53 @@ def main():
     st.title("AI Product Recommendation System")
     st.write("Search for fashion products using text or image!")
     
-    # Load data and models
-    df, loader = load_data()
-    text_embedding_generator, image_embedding_generator, vector_db = initialize_models()
+    # Ensure indexes directory exists
+    os.makedirs(INDEXES_DIR, exist_ok=True)
+    
+    # Load data
+    try:
+        df, loader = load_data()
+        st.success("✅ Product data loaded successfully")
+    except Exception as e:
+        st.error(f"❌ Failed to load product data: {e}")
+        st.stop()
+    
+    # Initialize models
+    try:
+        text_embedding_generator, image_embedding_generator, vector_db = initialize_models()
+        model_name = os.environ.get("VERTEX_EMBEDDING_MODEL", "text-embedding-005")
+        st.success(f"✅ Embedding models initialized successfully (using {model_name})")
+    except Exception as e:
+        st.error(f"❌ Failed to initialize embedding models: {e}")
+        st.error("This application requires access to Google Vertex AI. Please check your credentials.")
+        
+        # Show credentials path for debugging
+        st.info(f"GOOGLE_APPLICATION_CREDENTIALS: {GOOGLE_CREDENTIALS_PATH or 'Not set'}")
+        
+        instructions = """
+        ### Google Cloud Authentication Error
+        
+        To fix this:
+        1. Create a Google Cloud project and enable Vertex AI API
+        2. Create a service account with Vertex AI User permissions
+        3. Download the service account key as JSON
+        4. Set GOOGLE_APPLICATION_CREDENTIALS environment variable to the path of the JSON file
+        
+        Example:
+        ```
+        export GOOGLE_APPLICATION_CREDENTIALS=/path/to/your-key-file.json
+        ```
+        """
+        st.markdown(instructions)
+        st.stop()
     
     # Build or load indexes
-    build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db)
+    try:
+        build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db)
+    except Exception as e:
+        st.error(f"❌ Failed to build indexes: {e}")
+        st.error("Cannot continue without properly built indexes.")
+        st.stop()
     
     # Create tabs for different search modes
     tab1, tab2 = st.tabs(["Text Search", "Image Search"])
@@ -230,26 +289,32 @@ def main():
         if st.button("Search by Text"):
             if text_query.strip():
                 with st.spinner("Searching..."):
-                    # Generate text embedding for the query
-                    query_embedding = text_embedding_generator.generate_text_embedding(text_query)
-                    
-                    # Search by text with keyword boosting enabled
-                    distances, indices = vector_db.search_by_text(
-                        query_embedding, k=5, query_text=text_query, keyword_boost=True)
-                    
-                    # Display results
-                    st.subheader("Results")
-                    
-                    # Get product details
-                    products = loader.get_product_details(indices[0].tolist())
-                    
-                    # Display product description
-                    st.markdown(generate_product_description(products, text_query))
-                    
-                    # Display product cards
-                    for product in products:
-                        st.divider()
-                        display_product(product)
+                    try:
+                        # Generate text embedding for the query
+                        query_embedding = text_embedding_generator.generate_text_embedding(text_query)
+                        
+                        # Search by text with keyword boosting enabled
+                        distances, indices = vector_db.search_by_text(
+                            query_embedding, k=5, query_text=text_query, keyword_boost=True)
+                        
+                        # Display results
+                        st.subheader("Results")
+                        
+                        # Get product details
+                        products = loader.get_product_details(indices[0].tolist())
+                        
+                        if not products:
+                            st.warning("No products found matching your query.")
+                        else:
+                            # Display product description
+                            st.markdown(generate_product_description(products, text_query))
+                            
+                            # Display product cards
+                            for product in products:
+                                st.divider()
+                                display_product(product)
+                    except Exception as e:
+                        st.error(f"❌ Search failed: {e}")
     
     with tab2:
         st.header("Search by Image")
@@ -269,28 +334,34 @@ def main():
             
             if image:
                 with st.spinner("Analyzing image and searching for similar products..."):
-                    # Preprocess image
-                    img_array = image_embedding_generator.preprocess_image(image)
-                    
-                    # Generate image embedding
-                    query_embedding = image_embedding_generator.image_model.predict(img_array)[0]
-                    
-                    # Search by image
-                    distances, indices = vector_db.search_by_image(query_embedding, k=5)
-                    
-                    # Display results
-                    st.subheader("Results")
-                    
-                    # Get product details
-                    products = loader.get_product_details(indices[0].tolist())
-                    
-                    # Display product description
-                    st.markdown(generate_product_description(products, "your image"))
-                    
-                    # Display product cards
-                    for product in products:
-                        st.divider()
-                        display_product(product)
+                    try:
+                        # Preprocess image
+                        img_array = image_embedding_generator.preprocess_image(image)
+                        
+                        # Generate image embedding
+                        query_embedding = image_embedding_generator.image_model.predict(img_array)[0]
+                        
+                        # Search by image
+                        distances, indices = vector_db.search_by_image(query_embedding, k=5)
+                        
+                        # Display results
+                        st.subheader("Results")
+                        
+                        # Get product details
+                        products = loader.get_product_details(indices[0].tolist())
+                        
+                        if not products:
+                            st.warning("No products found matching your image.")
+                        else:
+                            # Display product description
+                            st.markdown(generate_product_description(products, "your image"))
+                            
+                            # Display product cards
+                            for product in products:
+                                st.divider()
+                                display_product(product)
+                    except Exception as e:
+                        st.error(f"❌ Image search failed: {e}")
 
 if __name__ == "__main__":
     main()
