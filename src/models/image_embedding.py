@@ -16,25 +16,12 @@ if torch.cuda.is_available():
     torch.cuda.manual_seed_all(42)
 
 class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
-    """
-    Class to generate image embeddings using OpenAI's CLIP model.
-    This provides multimodal embeddings that align images and text in the same vector space.
-    """
     
     def __init__(self, 
                  google_credentials_path: Optional[str] = None, 
                  vertex_ai_region: Optional[str] = None,
                  clip_model_name: str = "openai/clip-vit-base-patch32"):
-        """
-        Initialize the CLIP image embedding generator.
-        
-        Args:
-            google_credentials_path (str, optional): Path to Google Cloud service account credentials.
-                Not used for CLIP, but kept for compatibility with base class.
-            vertex_ai_region (str, optional): Google Cloud region for Vertex AI.
-                Not used for CLIP, but kept for compatibility with base class.
-            clip_model_name (str): Name of the CLIP model to use.
-        """
+
         super().__init__(google_credentials_path, vertex_ai_region)
         self.clip_model_name = clip_model_name
         self._load_clip_model()
@@ -67,15 +54,6 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
             self.clip_model = None
     
     def download_image(self, image_url: str) -> Optional[Image.Image]:
-        """
-        Download an image from a URL.
-        
-        Args:
-            image_url (str): URL of the image.
-            
-        Returns:
-            Optional[Image.Image]: PIL Image object or None if download fails.
-        """
         try:
             # Check if URL is valid before making a request
             if not image_url or not isinstance(image_url, str):
@@ -110,15 +88,6 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
             return None
     
     def preprocess_image(self, image: Image.Image) -> dict:
-        """
-        Preprocess image for the CLIP model.
-        
-        Args:
-            image (Image.Image): PIL Image object.
-            
-        Returns:
-            dict: Processed image inputs for the model.
-        """
         if self.clip_processor is None:
             raise ValueError("CLIP processor not initialized")
             
@@ -132,15 +101,6 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
         return inputs
     
     def generate_image_embedding(self, image_url: str) -> np.ndarray:
-        """
-        Generate embedding for an image.
-        
-        Args:
-            image_url (str): URL of the image.
-            
-        Returns:
-            np.ndarray: Image embedding vector.
-        """
         # Return cached embedding if available
         if image_url in self.image_embedding_cache:
             return self.image_embedding_cache[image_url]
@@ -176,15 +136,6 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
             return random_embedding
     
     def generate_embedding_from_pil_image(self, image: Image.Image) -> np.ndarray:
-        """
-        Generate embedding directly from a PIL image object.
-        
-        Args:
-            image (Image.Image): PIL Image object.
-            
-        Returns:
-            np.ndarray: Image embedding vector.
-        """
         # Create a hash of the image for caching
         # Use a more robust method that captures image content rather than just bytes
         width, height = image.size
@@ -235,15 +186,6 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
             return random_embedding
     
     def generate_batch_image_embeddings(self, image_urls: List[str]) -> np.ndarray:
-        """
-        Generate embeddings for multiple images.
-        
-        Args:
-            image_urls (List[str]): List of image URLs.
-            
-        Returns:
-            np.ndarray: Array of image embedding vectors.
-        """
         if not image_urls:
             return np.array([])
             
@@ -291,15 +233,6 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
         return np.array(embeddings)
     
     def generate_text_embedding(self, text: str) -> np.ndarray:
-        """
-        Generate embedding for text using CLIP's text encoder.
-        
-        Args:
-            text (str): Text to embed.
-            
-        Returns:
-            np.ndarray: Text embedding vector.
-        """
         # Return cached embedding if available
         if text in self.text_embedding_cache:
             return self.text_embedding_cache[text]
@@ -346,16 +279,6 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
             return random_embedding
     
     def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
-        """
-        Compute cosine similarity between two embeddings.
-        
-        Args:
-            embedding1 (np.ndarray): First embedding vector.
-            embedding2 (np.ndarray): Second embedding vector.
-            
-        Returns:
-            float: Cosine similarity score between 0 and 1.
-        """
         # Ensure embeddings are normalized
         embedding1 = embedding1 / np.linalg.norm(embedding1)
         embedding2 = embedding2 / np.linalg.norm(embedding2)
