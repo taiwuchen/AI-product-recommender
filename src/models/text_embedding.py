@@ -11,92 +11,95 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
     def __init__(self, google_credentials_path: Optional[str] = None, vertex_ai_region: Optional[str] = None):
         super().__init__(google_credentials_path, vertex_ai_region)
         
+        print(f"TextEmbeddingGenerator initialization: credentials path={google_credentials_path}, region={self.vertex_ai_region}")
+        
         if self.initialized:
             try:
                 # Get project ID from environment or use the specified project ID
                 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "authentic-arch-456221-j3")
                 
+                print(f"Attempting to initialize Vertex AI with project: {project_id}, region: {self.vertex_ai_region}")
                 # Initialize Vertex AI with project and location
                 vertexai.init(project=project_id, location=self.vertex_ai_region)
                 
-                # Use the specified text-embedding-large model
-                model_id = os.environ.get("VERTEX_EMBEDDING_MODEL", "text-embedding-large-exp-03-07")
+                # Use the recommended text-embedding-005 model (gecko is being discontinued)
+                model_id = os.environ.get("VERTEX_EMBEDDING_MODEL", "text-embedding-005")
                 
                 print(f"Initializing Vertex AI Text-Embeddings API with project: {project_id} and model: {model_id}")
                 # Initialize the Vertex AI Embedding model directly using the provided structure
                 self.text_embedding_model = TextEmbeddingModel.from_pretrained(model_id)
-                print(f"Vertex AI Text-Embeddings API initialized successfully with model: {model_id}")
+                print(f"✅ Vertex AI Text-Embeddings API initialized successfully with model: {model_id}")
                 self.using_vertex_ai = True
             except Exception as e:
-                print(f"Warning: Failed to initialize Vertex AI Text-Embeddings API: {e}")
-                print("This will result in random embeddings being used as fallback.")
+                print(f"❌ ERROR: Failed to initialize Vertex AI Text-Embeddings API: {e}")
+                print("The application requires Google Vertex AI Text Embeddings. Please check your credentials.")
                 self.text_embedding_model = None
                 self.using_vertex_ai = False
+                raise RuntimeError(f"Vertex AI initialization failed: {e}")
         else:
+            print("❌ ERROR: Base authentication failed")
             self.text_embedding_model = None
             self.using_vertex_ai = False
+            raise RuntimeError("Failed to authenticate with Google Cloud")
     
     def generate_text_embedding(self, text: str) -> np.ndarray:
         if not text.strip():
             # Return a zero vector for empty text
-            return np.zeros(768)  # Vertex AI embedding dimension
+            print("Empty text provided, returning zero vector")
+            return np.zeros(768, dtype=np.float32)  # Vertex AI embedding dimension
             
         try:
-            if self.using_vertex_ai and self.text_embedding_model:
-                # Use Vertex AI Text Embeddings API directly
-                embeddings = self.text_embedding_model.get_embeddings([text])
-                if embeddings and len(embeddings) > 0 and embeddings[0].values:
-                    return np.array(embeddings[0].values)
-                else:
-                    raise ValueError("Empty embedding response from Vertex AI")
+            print(f"Generating embedding for: '{text[:50]}...'")
+            embeddings = self.text_embedding_model.get_embeddings([text])
+            if embeddings and len(embeddings) > 0 and embeddings[0].values:
+                emb = np.array(embeddings[0].values)
+                print(f"Generated embedding with shape {emb.shape}")
+                return emb
             else:
-                # No fallback to TensorFlow, use random embedding instead
-                print("Warning: Using random embeddings as fallback. Vertex AI is not initialized.")
-                return np.random.randn(768).astype(np.float32)  # Random with Vertex AI dimension
+                raise ValueError("Empty embedding response from Vertex AI")
         except Exception as e:
-            print(f"Error generating text embedding: {e}")
-            # Return a random embedding as a last resort
-            return np.random.randn(768).astype(np.float32)
+            print(f"❌ ERROR generating text embedding: {e}")
+            raise RuntimeError(f"Failed to generate text embedding: {e}")
     
     def generate_batch_text_embeddings(self, texts: List[str]) -> np.ndarray:
         if not texts:
             return np.array([])
+        
+        print(f"Generating batch embeddings for {len(texts)} texts")
             
         try:
-            if self.using_vertex_ai and self.text_embedding_model:
-                # Use Vertex AI Text Embeddings API for batch processing
-                # Process in smaller batches to avoid API limitations
-                batch_size = 100  # Adjust based on Vertex AI limits
-                all_embeddings = []
+            # Process texts in batches - gecko allows larger batches
+            batch_size = 5  # Gecko model allows larger batches than text-embedding-large
+            all_embeddings = []
+            
+            for i in range(0, len(texts), batch_size):
+                batch_texts = texts[i:i+batch_size]
+                # Filter out empty strings to avoid API errors
+                valid_texts = [t for t in batch_texts if t.strip()]
+                valid_indices = [j for j, t in enumerate(batch_texts) if t.strip()]
                 
-                for i in range(0, len(texts), batch_size):
-                    batch_texts = texts[i:i+batch_size]
-                    # Filter out empty strings to avoid API errors
-                    valid_texts = [t for t in batch_texts if t.strip()]
-                    valid_indices = [i for i, t in enumerate(batch_texts) if t.strip()]
+                if i % 10 == 0:  # Only print progress every 10 items to reduce log clutter
+                    print(f"Processing batch {i//batch_size + 1}/{(len(texts)+batch_size-1)//batch_size}, valid texts: {len(valid_texts)}/{len(batch_texts)}")
+                
+                if valid_texts:
+                    # Get embeddings for valid texts
+                    batch_embeddings = self.text_embedding_model.get_embeddings(valid_texts)
                     
-                    if valid_texts:
-                        # Get embeddings for valid texts
-                        batch_embeddings = self.text_embedding_model.get_embeddings(valid_texts)
+                    # Realign with original indices (including empty strings)
+                    batch_result = [None] * len(batch_texts)
+                    for idx, emb in zip(valid_indices, batch_embeddings):
+                        batch_result[idx] = np.array(emb.values if hasattr(emb, 'values') else emb)
                         
-                        # Realign with original indices (including empty strings)
-                        batch_result = [None] * len(batch_texts)
-                        for idx, emb in zip(valid_indices, batch_embeddings):
-                            batch_result[idx] = np.array(emb.values if hasattr(emb, 'values') else emb)
+                    # Replace None values with zero vectors
+                    for j in range(len(batch_result)):
+                        if batch_result[j] is None:
+                            batch_result[j] = np.zeros(768, dtype=np.float32)  # Embedding dimension
                             
-                        # Replace None values with zero vectors
-                        for j in range(len(batch_result)):
-                            if batch_result[j] is None:
-                                batch_result[j] = np.zeros(768)  # Vertex AI embedding dimension
-                                
-                        all_embeddings.extend(batch_result)
-                
-                return np.array(all_embeddings)
-            else:
-                # No fallback to TensorFlow, use random embeddings instead
-                print("Warning: Using random embeddings as fallback for batch. Vertex AI is not initialized.")
-                return np.array([np.random.randn(768).astype(np.float32) for _ in texts])
+                    all_embeddings.extend(batch_result)
+            
+            stacked = np.array(all_embeddings)
+            print(f"✅ Generated {len(all_embeddings)} embeddings with shape: {stacked.shape}")
+            return stacked
         except Exception as e:
-            print(f"Error generating batch text embeddings: {e}")
-            # Return random embeddings as a last resort
-            return np.array([np.random.randn(768).astype(np.float32) for _ in texts])
+            print(f"❌ ERROR generating batch text embeddings: {e}")
+            raise RuntimeError(f"Failed to generate batch text embeddings: {e}")
