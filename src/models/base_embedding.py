@@ -27,19 +27,8 @@ def fix_certificate_verification():
 
 
 class BaseEmbeddingGenerator:
-    """
-    Base class for embedding generators with common functionality.
-    """
     
     def __init__(self, google_credentials_path: Optional[str] = None, vertex_ai_region: Optional[str] = None):
-        """
-        Initialize the base embedding generator.
-        
-        Args:
-            google_credentials_path (str, optional): Path to Google Cloud service account credentials.
-            vertex_ai_region (str, optional): Google Cloud region for Vertex AI. If None, uses environment 
-                                              variable VERTEX_AI_REGION or defaults to "us-central1".
-        """
         load_dotenv()
         
         # Fix SSL certificate issues before making any requests
@@ -67,4 +56,3 @@ class BaseEmbeddingGenerator:
             print(f"Google Cloud Vertex AI initialized successfully with region: {self.vertex_ai_region}")
         except Exception as e:
             print(f"Warning: Google Cloud initialization failed: {e}")
-            print("Will use backup TensorFlow models for embeddings")
