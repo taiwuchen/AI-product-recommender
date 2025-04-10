@@ -10,13 +10,13 @@ class VectorDatabase:
     Class to manage vector databases using FAISS.
     """
     
-    def __init__(self, dimension_text: int = 768, dimension_image: int = 1280):
+    def __init__(self, dimension_text: int = 768, dimension_image: int = 512):
         """
         Initialize the vector database.
         
         Args:
             dimension_text (int): Dimension of text embeddings (default is 768 for text-embedding-005).
-            dimension_image (int): Dimension of image embeddings.
+            dimension_image (int): Dimension of image embeddings (default is 512 for CLIP).
         """
         self.dimension_text = dimension_text
         self.dimension_image = dimension_image
@@ -71,6 +71,14 @@ class VectorDatabase:
         # Ensure embeddings are float32
         embeddings = embeddings.astype(np.float32)
         
+        # Check if the embedding dimension matches the index
+        if embeddings.shape[1] != self.dimension_image:
+            print(f"Warning: Image embedding dimension mismatch. Expected {self.dimension_image}, got {embeddings.shape[1]}.")
+            # Create a new index with the correct dimension
+            self.dimension_image = embeddings.shape[1]
+            self.index_image = faiss.IndexFlatL2(self.dimension_image)
+            print(f"Created new image index with dimension {self.dimension_image}")
+            
         # Add to index
         self.index_image.add(embeddings)
     
@@ -200,6 +208,17 @@ class VectorDatabase:
         Returns:
             Tuple[np.ndarray, np.ndarray]: Tuple of (distances, indices).
         """
+        # Check if index is empty
+        if self.index_image.ntotal == 0:
+            print("WARNING: Image index is empty. No results can be returned.")
+            return np.array([[0.0] * k]), np.array([[0] * k])
+            
+        # Check if the embedding dimension matches the index
+        if query_embedding.shape[0] != self.dimension_image:
+            print(f"Warning: Query image embedding dimension mismatch. Expected {self.dimension_image}, got {query_embedding.shape[0]}.")
+            # We can't search with mismatched dimensions, so we need to return empty results
+            return np.array([[0.0] * k]), np.array([[0] * k])
+            
         # Ensure query is float32
         query_embedding = query_embedding.astype(np.float32).reshape(1, -1)
         

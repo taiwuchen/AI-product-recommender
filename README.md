@@ -20,8 +20,13 @@ AI-product-recommender/
     ├── app/
     │   └── streamlit_app.py  # Streamlit web application
     ├── models/
-    │   ├── embeddings.py     # Text and image embedding generation
-    │   └── vector_db.py      # Vector database using FAISS
+    │   ├── embeddings.py         # Text and image embedding generation
+    │   ├── base_embedding.py     # Base embedding generator class
+    │   ├── text_embedding.py     # Text-specific embedding generation
+    │   ├── image_embedding.py    # Image-specific embedding generation
+    │   ├── clip_image_embedding.py # CLIP-based image embeddings
+    │   └── vector_db.py          # Vector database using FAISS
+    ├── demo_clip_embeddings.py   # Demo for CLIP embeddings
     └── utils/
         └── data_loader.py    # Data loading and preprocessing
 ```
@@ -61,6 +66,7 @@ streamlit run streamlit_app.py
 2. **Embedding Generation**:
    - Text embeddings are generated from product descriptions using Google Vertex AI
    - Image embeddings are generated from product images using TensorFlow's MobileNetV2 or Google Vertex AI
+   - CLIP embeddings provide multi-modal capabilities, aligning images and text in the same embedding space
 
 3. **Vector Database**: Embeddings are stored in FAISS, a library for efficient similarity search
 
@@ -73,9 +79,42 @@ streamlit run streamlit_app.py
 - **FAISS**: For vector similarity search
 - **TensorFlow**: For image embedding generation (fallback)
 - **Google Vertex AI**: For text embedding generation
+- **CLIP**: For multi-modal (text and image) embeddings in the same vector space
 - **Streamlit**: For the web interface
 - **Pillow**: For image processing
 - **NumPy/Pandas**: For data manipulation
+
+## Using CLIP Embeddings
+
+The project includes support for OpenAI's CLIP (Contrastive Language-Image Pre-training) model, which provides powerful multi-modal embeddings. CLIP aligns images and text in the same vector space, enabling:
+
+1. **Text-to-Image Search**: Find images that match a text description
+2. **Image-to-Text Matching**: Match images to the most relevant text description
+3. **Cross-modal Recommendations**: Use both text and image inputs for more robust recommendations
+
+To use CLIP embeddings:
+
+```python
+from models.clip_image_embedding import CLIPImageEmbeddingGenerator
+
+# Initialize the CLIP embedding generator
+clip_generator = CLIPImageEmbeddingGenerator(model_name="openai/clip-vit-base-patch32")
+
+# Generate image embedding from URL
+image_embedding = clip_generator.generate_image_embedding("https://example.com/image.jpg")
+
+# Generate text embedding
+text_embedding = clip_generator.generate_text_embedding("a blue denim jacket")
+
+# Compare similarity between image and text
+similarity = clip_generator.compute_similarity(image_embedding, text_embedding)
+print(f"Similarity score: {similarity}")
+```
+
+Run the demo script to see CLIP in action:
+```bash
+python src/demo_clip_embeddings.py --image_url="https://example.com/image.jpg" --text_query="a photo of a jacket"
+```
 
 ## License
 

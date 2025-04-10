@@ -335,11 +335,8 @@ def main():
             if image:
                 with st.spinner("Analyzing image and searching for similar products..."):
                     try:
-                        # Preprocess image
-                        img_array = image_embedding_generator.preprocess_image(image)
-                        
-                        # Generate image embedding
-                        query_embedding = image_embedding_generator.image_model.predict(img_array)[0]
+                        # Generate image embedding using CLIP
+                        query_embedding = image_embedding_generator.generate_embedding_from_pil_image(image)
                         
                         # Search by image
                         distances, indices = vector_db.search_by_image(query_embedding, k=5)
