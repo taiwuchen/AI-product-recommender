@@ -6,10 +6,6 @@ from PIL import Image
 import requests
 from io import BytesIO
 from typing import List, Dict, Optional
-import json  # Added for JSON handling
-
-# Set OpenRouter API key
-os.environ['OPENROUTER_API_KEY'] = "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"
 
 # Add parent directory to path to import modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,7 +15,6 @@ from models.base_embedding import fix_certificate_verification
 from models.text_embedding import TextEmbeddingGenerator
 from models.image_embedding import ImageEmbeddingGenerator
 from models.vector_db import VectorDatabase
-from models.embeddings import EmbeddingGenerator
 
 # Fix SSL certificates at the start of the application
 fix_certificate_verification()
@@ -93,127 +88,16 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
             vector_db.save_indices(INDEXES_DIR)
             st.success('Indexes built and saved successfully!')
 
-def generate_rag_description(products: List[Dict], query: Optional[str] = None):
-    """Generate an AI-powered description using RAG approach."""
-    # Enhanced RAG implementation using LLM
-    
+def generate_product_description(products: List[Dict], query: Optional[str] = None):
+    """Generate a description for product recommendations."""
     if not products:
         return ""
-    
-    # Extract information from products for context
-    product_info = []
-    for product in products:
-        if 'name' in product and 'details' in product and product['details'] and isinstance(product['details'], str):
-            product_info.append({
-                "name": product['name'],
-                "details": product['details']
-            })
-    
-    # Check if OpenRouter API key is available for Gemini
-    openrouter_api_key = os.environ.get('OPENROUTER_API_KEY')
-    
-    if product_info and openrouter_api_key:
-        try:
-            import requests
-            
-            # Create context from product information
-            context = "Based on the following products:\n"
-            for i, info in enumerate(product_info):
-                context += f"{i+1}. {info['name']}: {info['details']}\n"
-            
-            # Create improved prompt for the LLM that emphasizes query matching
-            if query:
-                prompt = f"{context}\n\nGenerate a helpful recommendation paragraph for the search query '{query}'. First, analyze how these products match the query terms. Then highlight common characteristics like product category, materials, and features that relate to the query. Be specific about how these products relate to '{query}' and why they would suit a customer looking for this type of product."
-            else:
-                prompt = f"{context}\n\nGenerate a concise recommendation paragraph for these products. Analyze common characteristics like product category, materials, and features. Mention how these products might suit the user's style and preferences."
-            
-            # Call OpenRouter API with Gemini
-            response = requests.post(
-                url="https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {openrouter_api_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://ai-product-recommender.app",
-                    "X-Title": "AI Product Recommender",
-                },
-                json={
-                    "model": "google/gemini-2.5-pro-exp-03-25:free",  # Using Gemini model
-                    "messages": [
-                        {"role": "system", "content": "You are a fashion retail assistant providing helpful product recommendations."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "max_tokens": 300,
-                    "temperature": 0.7
-                }
-            )
-            
-            response_data = response.json()
-            
-            # Extract and format the response
-            if response.status_code == 200 and "choices" in response_data and response_data["choices"]:
-                title = f"### AI-Generated Recommendation for '{query}'" if query else "### AI-Generated Recommendation"
-                description = response_data["choices"][0]["message"]["content"]
-                return f"{title}\n\n{description}"
-                
-        except Exception as e:
-            st.warning(f"Gemini API error: {e}. Trying alternative Gemini approach as fallback.")
-    
-    # If the first attempt with Gemini failed, try an alternative approach with Gemini
-    openrouter_api_key = os.environ.get('OPENROUTER_API_KEY', "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")
-    if product_info and openrouter_api_key:
-        try:
-            import requests
-            import json
-            
-            # Create context from product information
-            context = "Based on the following products:\n"
-            for i, info in enumerate(product_info):
-                context += f"{i+1}. {info['name']}: {info['details']}\n"
-            
-            # Create improved prompt for the LLM that emphasizes query matching
-            if query:
-                prompt = f"{context}\n\nGenerate a helpful recommendation paragraph for the search query '{query}'. First, analyze how these products match the query terms. Then highlight common characteristics like product category, materials, and features that relate to the query. Be specific about how these products relate to '{query}' and why they would suit a customer looking for this type of product."
-            else:
-                prompt = f"{context}\n\nGenerate a concise recommendation paragraph for these products. Analyze common characteristics like product category, materials, and features. Mention how these products might suit the user's style and preferences."
-            
-            # Call OpenRouter API with Gemini as a fallback
-            response = requests.post(
-                url="https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {openrouter_api_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://ai-product-recommender.app",
-                    "X-Title": "AI Product Recommender",
-                },
-                data=json.dumps({
-                    "model": "google/gemini-2.5-pro-exp-03-25:free",
-                    "messages": [
-                        {"role": "system", "content": "You are a fashion retail assistant providing helpful product recommendations."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "max_tokens": 300,
-                    "temperature": 0.7
-                })
-            )
-            
-            response_data = response.json()
-            
-            # Extract and format the response
-            if response.status_code == 200 and "choices" in response_data and response_data["choices"]:
-                title = f"### AI-Generated Recommendation for '{query}'" if query else "### AI-Generated Recommendation"
-                description = response_data["choices"][0]["message"]["content"]
-                return f"{title}\n\n{description}"
-                
-        except Exception as e:
-            st.warning(f"Alternative LLM API error: {e}. Using template-based description instead.")
-    
-    
-            
-    # Fallback to template-based approach if LLM fails or API key not available
+        
+    # Create description header
     if query:
-        description = f"### AI-Generated Recommendation for '{query}'\n\n"
+        description = f"### Product Recommendations for '{query}'\n\n"
     else:
-        description = "### AI-Generated Recommendation\n\n"
+        description = "### Product Recommendations\n\n"
     
     # Extract common characteristics
     categories = []
@@ -327,7 +211,7 @@ def display_product(product):
 def main():
     """Main function to run the Streamlit app."""
     st.title("AI Product Recommendation System")
-    st.write("Search for fashion products using text, image, or both!")
+    st.write("Search for fashion products using text or image!")
     
     # Load data and models
     df, loader = load_data()
@@ -337,7 +221,7 @@ def main():
     build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db)
     
     # Create tabs for different search modes
-    tab1, tab2, tab3, tab4 = st.tabs(["Text Search", "Image Search", "Hybrid Search", "Gemini Insights"])
+    tab1, tab2 = st.tabs(["Text Search", "Image Search"])
     
     with tab1:
         st.header("Search by Text")
@@ -359,8 +243,8 @@ def main():
                     # Get product details
                     products = loader.get_product_details(indices[0].tolist())
                     
-                    # Display RAG description
-                    st.markdown(generate_rag_description(products, text_query))
+                    # Display product description
+                    st.markdown(generate_product_description(products, text_query))
                     
                     # Display product cards
                     for product in products:
@@ -400,133 +284,13 @@ def main():
                     # Get product details
                     products = loader.get_product_details(indices[0].tolist())
                     
-                    # Display RAG description
-                    st.markdown(generate_rag_description(products, "your image"))
+                    # Display product description
+                    st.markdown(generate_product_description(products, "your image"))
                     
                     # Display product cards
                     for product in products:
                         st.divider()
                         display_product(product)
-    
-    with tab3:
-        st.header("Hybrid Search (Text + Image)")
-        
-        hybrid_text = st.text_input("Enter your search query (hybrid)", "casual jacket", key="hybrid_text_query")
-        
-        # Option to upload an image
-        hybrid_file = st.file_uploader("Choose an image (optional)", type=["jpg", "jpeg", "png"], key="hybrid_image_uploader")
-        
-        # Option to adjust weights
-        text_weight = st.slider("Text search weight", 0.0, 1.0, 0.5, 0.1, key="text_weight_slider")
-        image_weight = 1.0 - text_weight
-        
-        if st.button("Search with Hybrid Approach"):
-            # Check if at least one search criterion is provided
-            if hybrid_text.strip() or hybrid_file is not None:
-                with st.spinner("Searching with hybrid approach..."):
-                    text_embedding = None
-                    image_embedding = None
-                    
-                    # Generate text embedding if text provided
-                    if hybrid_text.strip():
-                        text_embedding = text_embedding_generator.generate_text_embedding(hybrid_text)
-                    
-                    # Generate image embedding if image provided
-                    if hybrid_file is not None:
-                        image = Image.open(hybrid_file)
-                        img_array = image_embedding_generator.preprocess_image(image)
-                        image_embedding = image_embedding_generator.image_model.predict(img_array)[0]
-                    
-                    # Perform hybrid search with keyword boosting from query text
-                    indices = vector_db.hybrid_search(
-                        text_embedding=text_embedding,
-                        image_embedding=image_embedding,
-                        k=5,
-                        alpha=text_weight,
-                        query_text=hybrid_text if hybrid_text.strip() else None
-                    )
-                    
-                    # Display results
-                    st.subheader("Results")
-                    
-                    # Get product details
-                    products = loader.get_product_details(indices)
-                    
-                    # Display RAG description
-                    st.markdown(generate_rag_description(products, hybrid_text if hybrid_text.strip() else "your criteria"))
-                    
-                    # Display product cards
-                    for product in products:
-                        st.divider()
-                        display_product(product)
-    
-    with tab4:
-        st.header("Gemini Multimodal Insights")
-        st.write("Get AI-powered insights about fashion items using both text and images.")
-        
-        # Create an instance of EmbeddingGenerator for multimodal descriptions
-        embedding_gen = EmbeddingGenerator()
-        
-        # Text input for query or instructions
-        gemini_text = st.text_area(
-            "Enter your question or instructions",
-            value="What kind of jacket is this? Describe the style, materials, and suggest occasions where it would be appropriate to wear it.",
-            height=100,
-            key="gemini_text_area"
-        )
-        
-        # Image upload
-        gemini_file = st.file_uploader("Upload an image of a fashion item", type=["jpg", "jpeg", "png"], key="gemini_uploader")
-        
-        # Option to use a URL for the image
-        gemini_image_url = st.text_input("Or enter an image URL", key="gemini_image_url")
-        
-        if st.button("Get Gemini Insights", key="gemini_insights_button"):
-            image = None
-            
-            # Get image from file or URL
-            if gemini_file is not None:
-                image = Image.open(gemini_file)
-                st.image(image, caption="Uploaded image", width=300)
-            elif gemini_image_url.strip():
-                image = download_image(gemini_image_url)
-                if image:
-                    st.image(image, caption="Image from URL", width=300)
-            
-            if gemini_text.strip() and image is not None:
-                with st.spinner("Generating insights from Gemini..."):
-                    # Use the multimodal model to generate insights
-                    insights = embedding_gen.generate_multimodal_description(gemini_text, image)
-                    
-                    # Display the results
-                    st.subheader("Gemini's Insights")
-                    st.markdown(insights)
-                    
-                    # Prompt for product search
-                    if st.button("Find similar products based on these insights", key="find_similar_button"):
-                        # Extract key terms from insights for search
-                        search_query = insights.split(".")[0]  # Use first sentence as query
-                        
-                        with st.spinner("Searching for similar products..."):
-                            # Generate text embedding for the query
-                            query_embedding = text_embedding_generator.generate_text_embedding(search_query)
-                            
-                            # Search by text with keyword boosting
-                            distances, indices = vector_db.search_by_text(
-                                query_embedding, k=5, query_text=search_query)
-                            
-                            # Get product details
-                            products = loader.get_product_details(indices[0].tolist())
-                            
-                            # Display product cards
-                            st.subheader("Similar Products")
-                            for product in products:
-                                st.divider()
-                                display_product(product)
-            elif not image:
-                st.warning("Please upload an image or provide an image URL.")
-            elif not gemini_text.strip():
-                st.warning("Please enter a question or instructions for Gemini.")
 
 if __name__ == "__main__":
     main()
