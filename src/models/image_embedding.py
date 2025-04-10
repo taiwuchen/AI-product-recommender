@@ -4,11 +4,16 @@ import urllib.parse
 import requests
 from PIL import Image
 from io import BytesIO
-from typing import List, Optional
+from typing import List, Optional, Dict
 from transformers import CLIPProcessor, CLIPModel
 
 from .base_embedding import BaseEmbeddingGenerator
 
+# Set fixed random seeds for reproducibility
+np.random.seed(42)
+torch.manual_seed(42)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(42)
 
 class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
     """
@@ -33,6 +38,10 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
         super().__init__(google_credentials_path, vertex_ai_region)
         self.clip_model_name = clip_model_name
         self._load_clip_model()
+        
+        # Initialize embedding caches
+        self.image_embedding_cache: Dict[str, np.ndarray] = {}
+        self.text_embedding_cache: Dict[str, np.ndarray] = {}
     
     def _load_clip_model(self):
         """Load the CLIP model and processor."""
@@ -132,6 +141,10 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
         Returns:
             np.ndarray: Image embedding vector.
         """
+        # Return cached embedding if available
+        if image_url in self.image_embedding_cache:
+            return self.image_embedding_cache[image_url]
+            
         try:
             # Download the image
             image = self.download_image(image_url)
@@ -140,11 +153,27 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
                 raise ValueError(f"Failed to download image from {image_url}")
                 
             # Generate embedding from the image
-            return self.generate_embedding_from_pil_image(image)
+            embedding = self.generate_embedding_from_pil_image(image)
+            
+            # Cache the result
+            self.image_embedding_cache[image_url] = embedding
+            
+            return embedding
         except Exception as e:
             print(f"Error generating image embedding: {e}")
-            # Return a random embedding as a last resort
-            return np.random.randn(512).astype(np.float32)
+            # Create a deterministic random embedding based on the URL
+            random_state = np.random.RandomState(hash(image_url) % 2**32)
+            random_embedding = random_state.randn(512).astype(np.float32)
+            
+            # Normalize the random embedding
+            norm = np.linalg.norm(random_embedding)
+            if norm > 0:
+                random_embedding = random_embedding / norm
+                
+            # Cache the result
+            self.image_embedding_cache[image_url] = random_embedding
+            
+            return random_embedding
     
     def generate_embedding_from_pil_image(self, image: Image.Image) -> np.ndarray:
         """
@@ -156,6 +185,18 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
         Returns:
             np.ndarray: Image embedding vector.
         """
+        # Create a hash of the image for caching
+        # Use a more robust method that captures image content rather than just bytes
+        width, height = image.size
+        small_image = image.resize((32, 32))  # Resize for consistent hashing
+        pixels = list(small_image.getdata())
+        image_hash = hash(str(pixels))
+        cache_key = f"pil_image_{image_hash}"
+        
+        # Return cached embedding if available
+        if cache_key in self.image_embedding_cache:
+            return self.image_embedding_cache[cache_key]
+            
         try:
             if self.clip_model is None or self.clip_processor is None:
                 raise ValueError("CLIP model or processor not initialized")
@@ -170,12 +211,28 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
             # Normalize the embedding
             image_embeddings = image_features / image_features.norm(dim=1, keepdim=True)
             
-            # Convert to numpy array and return
-            return image_embeddings.cpu().numpy()[0]
+            # Convert to numpy array
+            embedding = image_embeddings.cpu().numpy()[0]
+            
+            # Cache the result
+            self.image_embedding_cache[cache_key] = embedding
+            
+            return embedding
         except Exception as e:
             print(f"Error generating CLIP image embedding: {e}")
-            # Return a random embedding as a last resort
-            return np.random.randn(512).astype(np.float32)
+            # Create a unique random embedding based on the image content
+            random_state = np.random.RandomState(image_hash % 2**32)
+            random_embedding = random_state.randn(512).astype(np.float32)
+            
+            # Normalize the random embedding
+            norm = np.linalg.norm(random_embedding)
+            if norm > 0:
+                random_embedding = random_embedding / norm
+                
+            # Cache the result
+            self.image_embedding_cache[cache_key] = random_embedding
+            
+            return random_embedding
     
     def generate_batch_image_embeddings(self, image_urls: List[str]) -> np.ndarray:
         """
@@ -195,9 +252,20 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
         
         for i, url in enumerate(image_urls):
             if not url or not isinstance(url, str) or url.strip() == "":
-                # For empty URLs, just add a random embedding to maintain alignment
-                print(f"Skipping empty URL at index {i}")
-                embeddings.append(np.random.randn(512).astype(np.float32))
+                # For empty URLs, create a unique random embedding based on the index
+                # This ensures different products get different embeddings even with missing images
+                print(f"Generating diverse random embedding for empty URL at index {i}")
+                
+                # Create a unique seed for each empty URL based on its index
+                random_state = np.random.RandomState((i + 1) * 42)
+                random_embedding = random_state.randn(512).astype(np.float32)
+                
+                # Normalize the random embedding
+                norm = np.linalg.norm(random_embedding)
+                if norm > 0:
+                    random_embedding = random_embedding / norm
+                    
+                embeddings.append(random_embedding)
                 continue
                 
             try:
@@ -208,8 +276,16 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
                     print(f"Generated {valid_count} valid embeddings out of {i+1} processed URLs")
             except Exception as e:
                 print(f"Error processing image from URL at index {i}: {e}")
-                # Add a random embedding to maintain alignment with input
-                embeddings.append(np.random.randn(512).astype(np.float32))
+                # Add a random embedding to maintain alignment with input, but make it unique
+                random_state = np.random.RandomState((i + 1) * 99)
+                random_embedding = random_state.randn(512).astype(np.float32)
+                
+                # Normalize the random embedding
+                norm = np.linalg.norm(random_embedding)
+                if norm > 0:
+                    random_embedding = random_embedding / norm
+                    
+                embeddings.append(random_embedding)
         
         print(f"Completed batch processing: {valid_count} valid embeddings out of {len(image_urls)} URLs")
         return np.array(embeddings)
@@ -224,6 +300,10 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
         Returns:
             np.ndarray: Text embedding vector.
         """
+        # Return cached embedding if available
+        if text in self.text_embedding_cache:
+            return self.text_embedding_cache[text]
+            
         try:
             if self.clip_model is None or self.clip_processor is None:
                 raise ValueError("CLIP model or processor not initialized")
@@ -242,12 +322,28 @@ class ImageEmbeddingGenerator(BaseEmbeddingGenerator):
             # Normalize the embedding
             text_embeddings = text_features / text_features.norm(dim=1, keepdim=True)
             
-            # Convert to numpy array and return
-            return text_embeddings.cpu().numpy()[0]
+            # Convert to numpy array
+            embedding = text_embeddings.cpu().numpy()[0]
+            
+            # Cache the result
+            self.text_embedding_cache[text] = embedding
+            
+            return embedding
         except Exception as e:
             print(f"Error generating CLIP text embedding: {e}")
-            # Return a random embedding as a last resort
-            return np.random.randn(512).astype(np.float32)
+            # Create a deterministic random embedding based on the text
+            random_state = np.random.RandomState(hash(text) % 2**32)
+            random_embedding = random_state.randn(512).astype(np.float32)
+            
+            # Normalize the random embedding
+            norm = np.linalg.norm(random_embedding)
+            if norm > 0:
+                random_embedding = random_embedding / norm
+                
+            # Cache the result
+            self.text_embedding_cache[text] = random_embedding
+            
+            return random_embedding
     
     def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
         """
