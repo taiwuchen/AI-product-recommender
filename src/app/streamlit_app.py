@@ -19,6 +19,7 @@ from models.base_embedding import fix_certificate_verification
 from models.text_embedding import TextEmbeddingGenerator
 from models.image_embedding import ImageEmbeddingGenerator
 from models.vector_db import VectorDatabase
+from models.embeddings import EmbeddingGenerator
 
 # Fix SSL certificates at the start of the application
 fix_certificate_verification()
@@ -64,6 +65,13 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
        os.path.exists(os.path.join(INDEXES_DIR, 'image_index.faiss')):
         with st.spinner('Loading existing indexes...'):
             vector_db.load_indices(INDEXES_DIR)
+            
+            # If product_texts is empty, we need to store them (backward compatibility)
+            if not vector_db.product_texts:
+                vector_db.set_product_texts(df['text_for_embedding'].tolist())
+                # Save updated indices with product_texts
+                vector_db.save_indices(INDEXES_DIR)
+                
             st.success('Indexes loaded successfully!')
     else:
         with st.spinner('Building indexes. This may take a while...'):
@@ -76,6 +84,9 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
             # Add embeddings to vector db
             vector_db.add_text_embeddings(text_embeddings, list(range(len(df))))
             vector_db.add_image_embeddings(image_embeddings, list(range(len(df))))
+            
+            # Store original text data for keyword filtering
+            vector_db.set_product_texts(df['text_for_embedding'].tolist())
             
             # Save indexes
             os.makedirs(INDEXES_DIR, exist_ok=True)
@@ -110,9 +121,9 @@ def generate_rag_description(products: List[Dict], query: Optional[str] = None):
             for i, info in enumerate(product_info):
                 context += f"{i+1}. {info['name']}: {info['details']}\n"
             
-            # Create prompt for the LLM
+            # Create improved prompt for the LLM that emphasizes query matching
             if query:
-                prompt = f"{context}\n\nGenerate a concise recommendation paragraph for the search query '{query}'. Analyze common characteristics like product category, materials, and features. Mention how these products might suit the user's style and preferences."
+                prompt = f"{context}\n\nGenerate a helpful recommendation paragraph for the search query '{query}'. First, analyze how these products match the query terms. Then highlight common characteristics like product category, materials, and features that relate to the query. Be specific about how these products relate to '{query}' and why they would suit a customer looking for this type of product."
             else:
                 prompt = f"{context}\n\nGenerate a concise recommendation paragraph for these products. Analyze common characteristics like product category, materials, and features. Mention how these products might suit the user's style and preferences."
             
@@ -122,8 +133,8 @@ def generate_rag_description(products: List[Dict], query: Optional[str] = None):
                 headers={
                     "Authorization": f"Bearer {openrouter_api_key}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "https://ai-product-recommender.app",  # Replace with your actual site URL
-                    "X-Title": "AI Product Recommender",  # Replace with your actual site name
+                    "HTTP-Referer": "https://ai-product-recommender.app",
+                    "X-Title": "AI Product Recommender",
                 },
                 json={
                     "model": "google/gemini-2.5-pro-exp-03-25:free",  # Using Gemini model
@@ -159,9 +170,9 @@ def generate_rag_description(products: List[Dict], query: Optional[str] = None):
             for i, info in enumerate(product_info):
                 context += f"{i+1}. {info['name']}: {info['details']}\n"
             
-            # Create prompt for the LLM
+            # Create improved prompt for the LLM that emphasizes query matching
             if query:
-                prompt = f"{context}\n\nGenerate a concise recommendation paragraph for the search query '{query}'. Analyze common characteristics like product category, materials, and features. Mention how these products might suit the user's style and preferences."
+                prompt = f"{context}\n\nGenerate a helpful recommendation paragraph for the search query '{query}'. First, analyze how these products match the query terms. Then highlight common characteristics like product category, materials, and features that relate to the query. Be specific about how these products relate to '{query}' and why they would suit a customer looking for this type of product."
             else:
                 prompt = f"{context}\n\nGenerate a concise recommendation paragraph for these products. Analyze common characteristics like product category, materials, and features. Mention how these products might suit the user's style and preferences."
             
@@ -213,15 +224,28 @@ def generate_rag_description(products: List[Dict], query: Optional[str] = None):
         # Check that details is a string before calling .lower()
         if 'details' in product and product['details'] and isinstance(product['details'], str):
             details = product['details'].lower()
+            product_name = product.get('name', '').lower()
+            
+            # Check if query terms exist in product details or name
+            query_match = ""
+            if query:
+                query_terms = query.lower().split()
+                matches = []
+                for term in query_terms:
+                    if term in details or term in product_name:
+                        matches.append(term)
+                
+                if matches:
+                    query_match = f"These products match your search for '{query}' because they contain {', '.join(matches)}. "
             
             # Extract possible categories
-            if "bomber" in details:
+            if "bomber" in details or "bomber" in product_name:
                 categories.append("bomber")
-            elif "leather" in details:
+            elif "leather" in details or "leather" in product_name:
                 categories.append("leather")
-            elif "denim" in details:
+            elif "denim" in details or "denim" in product_name:
                 categories.append("denim")
-            elif "technical" in details:
+            elif "technical" in details or "technical" in product_name:
                 categories.append("technical")
             
             # Extract possible materials
@@ -231,8 +255,11 @@ def generate_rag_description(products: List[Dict], query: Optional[str] = None):
                 materials.append("linen")
             elif "suede" in details:
                 materials.append("suede")
-            elif "leather" in details and "faux" in details:
-                materials.append("faux leather")
+            elif "leather" in details:
+                if "faux" in details:
+                    materials.append("faux leather")
+                else:
+                    materials.append("leather")
             
             # Extract possible features
             if "zip" in details:
@@ -248,6 +275,9 @@ def generate_rag_description(products: List[Dict], query: Optional[str] = None):
     features = list(set(features))
     
     # Build the description
+    if query:
+        description += query_match
+        
     if categories:
         description += f"These recommendations focus on {', '.join(categories)} jackets "
         if materials:
@@ -319,8 +349,9 @@ def main():
                     # Generate text embedding for the query
                     query_embedding = text_embedding_generator.generate_text_embedding(text_query)
                     
-                    # Search by text
-                    distances, indices = vector_db.search_by_text(query_embedding, k=5)
+                    # Search by text with keyword boosting enabled
+                    distances, indices = vector_db.search_by_text(
+                        query_embedding, k=5, query_text=text_query, keyword_boost=True)
                     
                     # Display results
                     st.subheader("Results")
@@ -406,12 +437,13 @@ def main():
                         img_array = image_embedding_generator.preprocess_image(image)
                         image_embedding = image_embedding_generator.image_model.predict(img_array)[0]
                     
-                    # Perform hybrid search
+                    # Perform hybrid search with keyword boosting from query text
                     indices = vector_db.hybrid_search(
                         text_embedding=text_embedding,
                         image_embedding=image_embedding,
                         k=5,
-                        alpha=text_weight
+                        alpha=text_weight,
+                        query_text=hybrid_text if hybrid_text.strip() else None
                     )
                     
                     # Display results
@@ -431,6 +463,9 @@ def main():
     with tab4:
         st.header("Gemini Multimodal Insights")
         st.write("Get AI-powered insights about fashion items using both text and images.")
+        
+        # Create an instance of EmbeddingGenerator for multimodal descriptions
+        embedding_gen = EmbeddingGenerator()
         
         # Text input for query or instructions
         gemini_text = st.text_area(
@@ -461,7 +496,7 @@ def main():
             if gemini_text.strip() and image is not None:
                 with st.spinner("Generating insights from Gemini..."):
                     # Use the multimodal model to generate insights
-                    insights = text_embedding_generator.generate_multimodal_description(gemini_text, image)
+                    insights = embedding_gen.generate_multimodal_description(gemini_text, image)
                     
                     # Display the results
                     st.subheader("Gemini's Insights")
@@ -476,8 +511,9 @@ def main():
                             # Generate text embedding for the query
                             query_embedding = text_embedding_generator.generate_text_embedding(search_query)
                             
-                            # Search by text
-                            distances, indices = vector_db.search_by_text(query_embedding, k=5)
+                            # Search by text with keyword boosting
+                            distances, indices = vector_db.search_by_text(
+                                query_embedding, k=5, query_text=search_query)
                             
                             # Get product details
                             products = loader.get_product_details(indices[0].tolist())
