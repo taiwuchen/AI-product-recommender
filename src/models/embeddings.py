@@ -5,18 +5,8 @@ from .image_embedding import ImageEmbeddingGenerator
 from typing import Optional
 
 class EmbeddingGenerator:
-    """
-    Combined class for backward compatibility that uses both text and image embedding generators.
-    """
     
     def __init__(self, google_credentials_path: Optional[str] = None, vertex_ai_region: Optional[str] = None):
-        """
-        Initialize both text and image embedding generators.
-        
-        Args:
-            google_credentials_path (str, optional): Path to Google Cloud service account credentials.
-            vertex_ai_region (str, optional): Google Cloud region for Vertex AI.
-        """
         self.text_generator = TextEmbeddingGenerator(google_credentials_path, vertex_ai_region)
         self.image_generator = ImageEmbeddingGenerator(google_credentials_path, vertex_ai_region)
         
