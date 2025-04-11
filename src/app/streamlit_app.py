@@ -103,7 +103,6 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
             raise RuntimeError(f"Index building failed: {e}")
 
 def generate_product_description(products: List[Dict], query: Optional[str] = None):
-    """Generate a description for product recommendations."""
     if not products:
         return ""
         
@@ -191,7 +190,6 @@ def generate_product_description(products: List[Dict], query: Optional[str] = No
     return description
 
 def download_image(image_url):
-    """Download image from URL."""
     try:
         # Add headers to mimic a browser request
         headers = {
@@ -223,7 +221,6 @@ def display_product(product):
         st.write(f"[View on ZARA]({product['link']})")
 
 def main():
-    """Main function to run the Streamlit app."""
     st.title("AI Product Recommendation System")
     st.write("Search for fashion products using text or image!")
     
@@ -246,26 +243,6 @@ def main():
     except Exception as e:
         st.error(f"❌ Failed to initialize embedding models: {e}")
         st.error("This application requires access to Google Vertex AI. Please check your credentials.")
-        
-        # Show credentials path for debugging
-        st.info(f"GOOGLE_APPLICATION_CREDENTIALS: {GOOGLE_CREDENTIALS_PATH or 'Not set'}")
-        
-        instructions = """
-        ### Google Cloud Authentication Error
-        
-        To fix this:
-        1. Create a Google Cloud project and enable Vertex AI API
-        2. Create a service account with Vertex AI User permissions
-        3. Download the service account key as JSON
-        4. Set GOOGLE_APPLICATION_CREDENTIALS environment variable to the path of the JSON file
-        
-        Example:
-        ```
-        export GOOGLE_APPLICATION_CREDENTIALS=/path/to/your-key-file.json
-        ```
-        """
-        st.markdown(instructions)
-        st.stop()
     
     # Build or load indexes
     try:
