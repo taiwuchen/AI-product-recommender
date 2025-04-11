@@ -1,5 +1,5 @@
 # Export components from respective modules
-from .text_embedding import fix_certificate_verification, BaseEmbeddingGenerator, TextEmbeddingGenerator
+from .text_embedding import TextEmbeddingGenerator
 from .image_embedding import ImageEmbeddingGenerator
 from typing import Optional
 

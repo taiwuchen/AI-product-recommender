@@ -6,18 +6,7 @@ from typing import List, Dict, Tuple, Optional, Union
 
 
 class VectorDatabase:
-    """
-    Class to manage vector databases using FAISS.
-    """
-    
     def __init__(self, dimension_text: int = 768, dimension_image: int = 512):
-        """
-        Initialize the vector database.
-        
-        Args:
-            dimension_text (int): Dimension of text embeddings (default is 768 for text-embedding-005).
-            dimension_image (int): Dimension of image embeddings (default is 512 for CLIP).
-        """
         self.dimension_text = dimension_text
         self.dimension_image = dimension_image
         
@@ -32,13 +21,6 @@ class VectorDatabase:
         self.product_texts = []
         
     def add_text_embeddings(self, embeddings: np.ndarray, ids: List[int]) -> None:
-        """
-        Add text embeddings to the index.
-        
-        Args:
-            embeddings (np.ndarray): Array of text embedding vectors.
-            ids (List[int]): List of product IDs.
-        """
         if len(embeddings) == 0:
             return
             
@@ -64,13 +46,6 @@ class VectorDatabase:
         self.product_ids.extend(ids)
         
     def add_image_embeddings(self, embeddings: np.ndarray, ids: List[int]) -> None:
-        """
-        Add image embeddings to the index.
-        
-        Args:
-            embeddings (np.ndarray): Array of image embedding vectors.
-            ids (List[int]): List of product IDs.
-        """
         if len(embeddings) == 0:
             return
             
@@ -93,28 +68,10 @@ class VectorDatabase:
         self.index_image.add(embeddings)
     
     def set_product_texts(self, texts: List[str]) -> None:
-        """
-        Store original product text data for keyword filtering.
-        
-        Args:
-            texts (List[str]): List of product text data.
-        """
         self.product_texts = texts
         
     def search_by_text(self, query_embedding: np.ndarray, k: int = 5, 
                        query_text: Optional[str] = None, keyword_boost: bool = True) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Search for similar products by text, with optional keyword boosting.
-        
-        Args:
-            query_embedding (np.ndarray): Text embedding of the query.
-            k (int): Number of results to return.
-            query_text (str, optional): The original query text for keyword matching.
-            keyword_boost (bool): Whether to boost results containing query keywords.
-            
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: Tuple of (distances, indices).
-        """
         # Check if index is empty
         if self.index_text.ntotal == 0:
             print("WARNING: Text index is empty. No results can be returned.")
@@ -208,16 +165,6 @@ class VectorDatabase:
         return distances, indices[:, :result_k]
     
     def search_by_image(self, query_embedding: np.ndarray, k: int = 5) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Search for similar products by image.
-        
-        Args:
-            query_embedding (np.ndarray): Image embedding of the query.
-            k (int): Number of results to return.
-            
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: Tuple of (distances, indices).
-        """
         # Check if index is empty
         if self.index_image.ntotal == 0:
             print("WARNING: Image index is empty. No results can be returned.")
@@ -241,19 +188,6 @@ class VectorDatabase:
                      image_embedding: Optional[np.ndarray] = None, 
                      k: int = 5, alpha: float = 0.5,
                      query_text: Optional[str] = None) -> List[int]:
-        """
-        Perform hybrid search combining text and image similarity.
-        
-        Args:
-            text_embedding (np.ndarray, optional): Text embedding of the query.
-            image_embedding (np.ndarray, optional): Image embedding of the query.
-            k (int): Number of results to return.
-            alpha (float): Weight for text search (1-alpha will be weight for image search).
-            query_text (str, optional): Original query text for keyword matching.
-            
-        Returns:
-            List[int]: List of product indices.
-        """
         results = {}
         
         # If we have text embedding, search by text
@@ -283,13 +217,7 @@ class VectorDatabase:
         # Return just the indices
         return [idx for idx, _ in sorted_results]
     
-    def save_indices(self, save_dir: str) -> None:
-        """
-        Save the FAISS indices to disk.
-        
-        Args:
-            save_dir (str): Directory to save indices to.
-        """
+    def save_indices(self, save_dir: str) -> None: 
         os.makedirs(save_dir, exist_ok=True)
         
         # Save text index
@@ -311,12 +239,6 @@ class VectorDatabase:
             pickle.dump({'text': self.dimension_text, 'image': self.dimension_image}, f)
     
     def load_indices(self, save_dir: str) -> None:
-        """
-        Load the FAISS indices from disk.
-        
-        Args:
-            save_dir (str): Directory to load indices from.
-        """
         # Try to load dimensions if available
         try:
             with open(os.path.join(save_dir, 'dimensions.pkl'), 'rb') as f:
