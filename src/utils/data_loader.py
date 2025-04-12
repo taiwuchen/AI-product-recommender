@@ -5,37 +5,15 @@ import os
 
 
 class ProductDataLoader:
-    """
-    Class to load and preprocess product data from CSV files.
-    """
-    
     def __init__(self, data_path: str):
-        """
-        Initialize the data loader.
-        
-        Args:
-            data_path (str): Path to the CSV file containing product data.
-        """
         self.data_path = data_path
         self.df = None
         
     def load_data(self) -> pd.DataFrame:
-        """
-        Load the data from CSV file.
-        
-        Returns:
-            pd.DataFrame: DataFrame containing the product data.
-        """
         self.df = pd.read_csv(self.data_path)
         return self.df
     
     def preprocess_data(self) -> pd.DataFrame:
-        """
-        Preprocess the data for embedding generation.
-        
-        Returns:
-            pd.DataFrame: Preprocessed DataFrame.
-        """
         if self.df is None:
             self.load_data()
         
@@ -48,15 +26,14 @@ class ProductDataLoader:
         return self.df
     
     def _extract_first_image_url(self, image_data_str: str) -> str:
-        """
-        Extract the first image URL from the product_images column.
-        
-        Args:
-            image_data_str (str): String representation of image data.
+        if not image_data_str or not isinstance(image_data_str, str):
+            return ""
             
-        Returns:
-            str: First image URL or empty string if extraction fails.
-        """
+        # If it looks like a direct URL, return it as is
+        if image_data_str.startswith('http'):
+            return image_data_str.strip()
+            
+        # Otherwise try to parse it as a JSON structure
         try:
             # Convert string representation of list to actual list
             image_data = ast.literal_eval(image_data_str)
@@ -68,26 +45,25 @@ class ProductDataLoader:
             
             return ""
         except (SyntaxError, ValueError):
-            return ""
+            # If we can't parse it, return the raw string (might be a URL with special chars)
+            return image_data_str.strip()
     
     def get_product_details(self, product_indices: List[int]) -> List[Dict]:
-        """
-        Get details for a list of product indices.
-        
-        Args:
-            product_indices (List[int]): List of product indices.
-            
-        Returns:
-            List[Dict]: List of dictionaries with product details.
-        """
         if self.df is None:
             self.preprocess_data()
             
         products = []
         for idx in product_indices:
             if 0 <= idx < len(self.df):
-                # Get direct image URL from product_images column (already contains a valid URL)
-                image_url = self.df.loc[idx, 'product_images']
+                # Get the processed image URL from first_image_url column
+                image_url = self.df.loc[idx, 'first_image_url']
+                
+                # Make sure we have a valid image URL
+                if not image_url or not isinstance(image_url, str):
+                    # Fallback to raw product_images as a direct URL
+                    image_url = self.df.loc[idx, 'product_images']
+                    if not (isinstance(image_url, str) and image_url.startswith('http')):
+                        image_url = None
                 
                 product = {
                     'name': self.df.loc[idx, 'product_name'],
