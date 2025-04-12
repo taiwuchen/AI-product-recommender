@@ -30,13 +30,11 @@ st.set_page_config(
 
 @st.cache_resource
 def load_data():
-    """Load and preprocess the product data."""
     loader = ProductDataLoader(DATA_PATH)
     return loader.preprocess_data(), loader
 
 @st.cache_resource
 def initialize_models():
-    """Initialize the embedding generators and vector database."""
     # Create separate text and image embedding generators
     text_embedding_generator = TextEmbeddingGenerator(
         google_credentials_path=GOOGLE_CREDENTIALS_PATH
@@ -50,8 +48,6 @@ def initialize_models():
     return text_embedding_generator, image_embedding_generator, vector_db
 
 def build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db):
-    """Build or load vector indexes."""
-    
     # Delete existing indexes to force rebuild
     import shutil
     if os.path.exists(INDEXES_DIR):
@@ -207,7 +203,6 @@ def download_image(image_url):
         return None
 
 def display_product(product):
-    """Display a product card."""
     col1, col2 = st.columns([1, 3])
     
     with col1:

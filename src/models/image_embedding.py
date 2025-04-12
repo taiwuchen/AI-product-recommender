@@ -28,7 +28,6 @@ class ImageEmbeddingGenerator:
         self.text_embedding_cache: Dict[str, np.ndarray] = {}
     
     def _load_clip_model(self):
-        """Load the CLIP model and processor."""
         try:
             print(f"Loading CLIP model: {self.clip_model_name}...")
             
