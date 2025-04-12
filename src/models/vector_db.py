@@ -184,39 +184,6 @@ class VectorDatabase:
         
         return distances, indices
     
-    def hybrid_search(self, text_embedding: Optional[np.ndarray] = None, 
-                     image_embedding: Optional[np.ndarray] = None, 
-                     k: int = 5, alpha: float = 0.5,
-                     query_text: Optional[str] = None) -> List[int]:
-        results = {}
-        
-        # If we have text embedding, search by text
-        if text_embedding is not None:
-            text_distances, text_indices = self.search_by_text(
-                text_embedding, k=k*2, query_text=query_text)
-            
-            # Add to results dict with weight
-            for i, idx in enumerate(text_indices[0]):
-                if idx not in results:
-                    results[idx] = 0
-                results[idx] += alpha * (1 - text_distances[0][i] / max(text_distances[0]) if max(text_distances[0]) > 0 else 1.0)
-        
-        # If we have image embedding, search by image
-        if image_embedding is not None:
-            image_distances, image_indices = self.search_by_image(image_embedding, k=k*2)
-            
-            # Add to results dict with weight
-            for i, idx in enumerate(image_indices[0]):
-                if idx not in results:
-                    results[idx] = 0
-                results[idx] += (1 - alpha) * (1 - image_distances[0][i] / max(image_distances[0]) if max(image_distances[0]) > 0 else 1.0)
-        
-        # Sort by combined score and get top k
-        sorted_results = sorted(results.items(), key=lambda x: x[1], reverse=True)[:k]
-        
-        # Return just the indices
-        return [idx for idx, _ in sorted_results]
-    
     def save_indices(self, save_dir: str) -> None: 
         os.makedirs(save_dir, exist_ok=True)
         
