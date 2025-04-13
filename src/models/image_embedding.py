@@ -49,7 +49,7 @@ class ImageEmbeddingGenerator:
             self.clip_processor = None
             self.clip_model = None
     
-    def download_image(self, image_url: str) -> Optional[Image.Image]:
+    def download_image(self, image_url: str, convert_to_rgb: bool = True, referer: str = 'https://www.google.com/') -> Optional[Image.Image]:
         try:
             # Check if URL is valid before making a request
             if not image_url or not isinstance(image_url, str):
@@ -72,13 +72,19 @@ class ImageEmbeddingGenerator:
                 'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
                 'Accept-Encoding': 'gzip, deflate, br',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Referer': 'https://www.google.com/'
+                'Referer': referer
             }
             
             # Download the image
             response = requests.get(image_url, stream=True, headers=headers)
             response.raise_for_status()
-            return Image.open(BytesIO(response.content)).convert('RGB')
+            
+            # Open image and optionally convert to RGB (needed for CLIP model)
+            image = Image.open(BytesIO(response.content))
+            if convert_to_rgb:
+                image = image.convert('RGB')
+                
+            return image
         except Exception as e:
             print(f"Error downloading image from {image_url}: {e}")
             return None
@@ -103,7 +109,7 @@ class ImageEmbeddingGenerator:
             
         try:
             # Download the image
-            image = self.download_image(image_url)
+            image = self.download_image(image_url, convert_to_rgb=True)
             
             if image is None:
                 raise ValueError(f"Failed to download image from {image_url}")
