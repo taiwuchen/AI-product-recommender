@@ -234,52 +234,6 @@ class ImageEmbeddingGenerator:
         print(f"Completed batch processing: {valid_count} valid embeddings out of {len(image_urls)} URLs")
         return np.array(embeddings)
     
-    def generate_text_embedding(self, text: str) -> np.ndarray:
-        # Return cached embedding if available
-        if text in self.text_embedding_cache:
-            return self.text_embedding_cache[text]
-            
-        try:
-            if self.clip_model is None or self.clip_processor is None:
-                raise ValueError("CLIP model or processor not initialized")
-                
-            # Process text using CLIP processor
-            inputs = self.clip_processor(text=text, return_tensors="pt", padding=True, truncation=True)
-            
-            # Move inputs to the same device as the model
-            if hasattr(self, 'device'):
-                inputs = {k: v.to(self.device) for k, v in inputs.items() if k != 'pixel_values'}
-            
-            # Generate embedding
-            with torch.no_grad():
-                text_features = self.clip_model.get_text_features(**inputs)
-                
-            # Normalize the embedding
-            text_embeddings = text_features / text_features.norm(dim=1, keepdim=True)
-            
-            # Convert to numpy array
-            embedding = text_embeddings.cpu().numpy()[0]
-            
-            # Cache the result
-            self.text_embedding_cache[text] = embedding
-            
-            return embedding
-        except Exception as e:
-            print(f"Error generating CLIP text embedding: {e}")
-            # Create a deterministic random embedding based on the text
-            random_state = np.random.RandomState(hash(text) % 2**32)
-            random_embedding = random_state.randn(512).astype(np.float32)
-            
-            # Normalize the random embedding
-            norm = np.linalg.norm(random_embedding)
-            if norm > 0:
-                random_embedding = random_embedding / norm
-                
-            # Cache the result
-            self.text_embedding_cache[text] = random_embedding
-            
-            return random_embedding
-    
     def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
         # Ensure embeddings are normalized
         embedding1 = embedding1 / np.linalg.norm(embedding1)
