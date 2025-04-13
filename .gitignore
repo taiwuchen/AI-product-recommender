@@ -1,3 +1,4 @@
 indexes/
 .venv/
 __pycache__/
+vector_search_rag_demo.ipynb

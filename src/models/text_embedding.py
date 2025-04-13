@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Union
 import os
 import vertexai
 from vertexai.language_models import TextEmbeddingModel
@@ -43,9 +43,7 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
             try:
                 # Get project ID from environment or use the specified project ID
                 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "authentic-arch-456221-j3")
-                
                 print(f"Attempting to initialize Vertex AI with project: {project_id}, region: {self.vertex_ai_region}")
-                # Initialize Vertex AI with project and location
                 vertexai.init(project=project_id, location=self.vertex_ai_region)
                 
                 # Use the recommended text-embedding-005 model (gecko is being discontinued)
@@ -68,57 +66,61 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
             self.using_vertex_ai = False
             raise RuntimeError("Failed to authenticate with Google Cloud")
     
-    def generate_text_embedding(self, text: str) -> np.ndarray:
-        if not text.strip():
-            # Return a zero vector for empty text
-            print("Empty text provided, returning zero vector")
-            return np.zeros(768, dtype=np.float32)  # Vertex AI embedding dimension
+    def generate_text_embedding(self, text: Union[str, List[str]]) -> np.ndarray:
+        # Handle empty input cases
+        if isinstance(text, str):
+            if not text.strip():
+                print("Empty text provided, returning zero vector")
+                return np.zeros(768, dtype=np.float32)  # Vertex AI embedding dimension
             
-        try:
-            embeddings = self.text_embedding_model.get_embeddings([text])
-            if embeddings and len(embeddings) > 0 and embeddings[0].values:
-                emb = np.array(embeddings[0].values)
-                return emb
-            else:
-                raise ValueError("Empty embedding response from Vertex AI")
-        except Exception as e:
-            print(f"❌ ERROR generating text embedding: {e}")
-            raise RuntimeError(f"Failed to generate text embedding: {e}")
-    
-    def generate_batch_text_embeddings(self, texts: List[str]) -> np.ndarray:
-        if not texts:
-            return np.array([])
-            
-        try:
-            # Process texts in batches - gecko allows larger batches
-            batch_size = 5  # Gecko model allows larger batches than text-embedding-large
-            all_embeddings = []
-            
-            for i in range(0, len(texts), batch_size):
-                batch_texts = texts[i:i+batch_size]
-                # Filter out empty strings to avoid API errors
-                valid_texts = [t for t in batch_texts if t.strip()]
-                valid_indices = [j for j, t in enumerate(batch_texts) if t.strip()]
+            # Single text case
+            try:
+                embeddings = self.text_embedding_model.get_embeddings([text])
+                if embeddings and len(embeddings) > 0 and embeddings[0].values:
+                    emb = np.array(embeddings[0].values)
+                    return emb
+                else:
+                    raise ValueError("Empty embedding response from Vertex AI")
+            except Exception as e:
+                print(f"❌ ERROR generating text embedding: {e}")
+                raise RuntimeError(f"Failed to generate text embedding: {e}")
+        
+        elif isinstance(text, list):
+            texts = text
+            if not texts:
+                return np.array([])
                 
-                if valid_texts:
-                    # Get embeddings for valid texts
-                    batch_embeddings = self.text_embedding_model.get_embeddings(valid_texts)
+            try:
+                batch_size = 5
+                all_embeddings = []
+                
+                for i in range(0, len(texts), batch_size):
+                    batch_texts = texts[i:i+batch_size]
+                    # Filter out empty strings to avoid API errors
+                    valid_texts = [t for t in batch_texts if t.strip()]
+                    valid_indices = [j for j, t in enumerate(batch_texts) if t.strip()]
                     
-                    # Realign with original indices (including empty strings)
-                    batch_result = [None] * len(batch_texts)
-                    for idx, emb in zip(valid_indices, batch_embeddings):
-                        batch_result[idx] = np.array(emb.values if hasattr(emb, 'values') else emb)
+                    if valid_texts:
+                        # Get embeddings for valid texts
+                        batch_embeddings = self.text_embedding_model.get_embeddings(valid_texts)
                         
-                    # Replace None values with zero vectors
-                    for j in range(len(batch_result)):
-                        if batch_result[j] is None:
-                            batch_result[j] = np.zeros(768, dtype=np.float32)  # Embedding dimension
+                        # Realign with original indices (including empty strings)
+                        batch_result = [None] * len(batch_texts)
+                        for idx, emb in zip(valid_indices, batch_embeddings):
+                            batch_result[idx] = np.array(emb.values if hasattr(emb, 'values') else emb)
                             
-                    all_embeddings.extend(batch_result)
-            
-            stacked = np.array(all_embeddings)
-            print(f"✅ Generated {len(all_embeddings)} embeddings with shape: {stacked.shape}")
-            return stacked
-        except Exception as e:
-            print(f"❌ ERROR generating batch text embeddings: {e}")
-            raise RuntimeError(f"Failed to generate batch text embeddings: {e}")
+                        # Replace None values with zero vectors
+                        for j in range(len(batch_result)):
+                            if batch_result[j] is None:
+                                batch_result[j] = np.zeros(768, dtype=np.float32)
+                                
+                        all_embeddings.extend(batch_result)
+                
+                stacked = np.array(all_embeddings)
+                print(f"✅ Generated {len(all_embeddings)} embeddings with shape: {stacked.shape}")
+                return stacked
+            except Exception as e:
+                print(f"❌ ERROR generating batch text embeddings: {e}")
+                raise RuntimeError(f"Failed to generate batch text embeddings: {e}")
+        else:
+            raise TypeError("Input must be either a string or a list of strings")
