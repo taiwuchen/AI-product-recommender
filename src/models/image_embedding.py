@@ -39,10 +39,8 @@ class ImageEmbeddingGenerator:
             if torch.cuda.is_available():
                 self.clip_model = self.clip_model.to("cuda")
                 self.device = "cuda"
-                print("CLIP model loaded on GPU")
             else:
                 self.device = "cpu"
-                print("CLIP model loaded on CPU")
                 
         except Exception as e:
             print(f"Warning: Failed to load CLIP model: {e}")
@@ -198,7 +196,6 @@ class ImageEmbeddingGenerator:
             if not url or not isinstance(url, str) or url.strip() == "":
                 # For empty URLs, create a unique random embedding based on the index
                 # This ensures different products get different embeddings even with missing images
-                print(f"Generating diverse random embedding for empty URL at index {i}")
                 
                 # Create a unique seed for each empty URL based on its index
                 random_state = np.random.RandomState((i + 1) * 42)
@@ -216,8 +213,6 @@ class ImageEmbeddingGenerator:
                 embedding = self.generate_image_embedding(url)
                 embeddings.append(embedding)
                 valid_count += 1
-                if valid_count % 10 == 0:
-                    print(f"Generated {valid_count} valid embeddings out of {i+1} processed URLs")
             except Exception as e:
                 print(f"Error processing image from URL at index {i}: {e}")
                 # Add a random embedding to maintain alignment with input, but make it unique
@@ -231,7 +226,6 @@ class ImageEmbeddingGenerator:
                     
                 embeddings.append(random_embedding)
         
-        print(f"Completed batch processing: {valid_count} valid embeddings out of {len(image_urls)} URLs")
         return np.array(embeddings)
     
     def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
