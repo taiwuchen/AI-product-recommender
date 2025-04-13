@@ -193,7 +193,6 @@ def display_product(product):
     col1, col2 = st.columns([1, 3])
     
     with col1:
-        # Use the image_embedding_generator's download_image method instead
         try:
             image = image_embedding_generator.download_image(product['image_url'], convert_to_rgb=True, referer='https://www.zara.com/')
             if image:
