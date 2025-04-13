@@ -28,6 +28,11 @@ st.set_page_config(
     layout="wide"
 )
 
+# Global variables for models
+text_embedding_generator = None
+image_embedding_generator = None
+vector_db = None
+
 @st.cache_resource
 def load_data():
     loader = ProductDataLoader(DATA_PATH)
@@ -35,6 +40,8 @@ def load_data():
 
 @st.cache_resource
 def initialize_models():
+    global text_embedding_generator, image_embedding_generator, vector_db
+    
     # Create separate text and image embedding generators
     text_embedding_generator = TextEmbeddingGenerator(
         google_credentials_path=GOOGLE_CREDENTIALS_PATH
@@ -185,30 +192,19 @@ def generate_product_description(products: List[Dict], query: Optional[str] = No
     
     return description
 
-def download_image(image_url):
-    try:
-        # Add headers to mimic a browser request
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Referer': 'https://www.zara.com/'
-        }
-        response = requests.get(image_url, stream=True, headers=headers)
-        response.raise_for_status()
-        return Image.open(BytesIO(response.content))
-    except Exception as e:
-        st.error(f"Error downloading image: {e}")
-        return None
-
 def display_product(product):
     col1, col2 = st.columns([1, 3])
     
     with col1:
-        image = download_image(product['image_url'])
-        if image:
-            st.image(image, use_container_width=True)
+        # Use the image_embedding_generator's download_image method instead
+        try:
+            image = image_embedding_generator.download_image(product['image_url'], convert_to_rgb=True, referer='https://www.zara.com/')
+            if image:
+                st.image(image, use_container_width=True)
+            else:
+                st.error("Failed to load image")
+        except Exception as e:
+            st.error(f"Error downloading image: {e}")
     
     with col2:
         st.subheader(product['name'])
@@ -232,6 +228,8 @@ def main():
     
     # Initialize models
     try:
+        # Use global variables
+        global text_embedding_generator, image_embedding_generator, vector_db
         text_embedding_generator, image_embedding_generator, vector_db = initialize_models()
         model_name = os.environ.get("VERTEX_EMBEDDING_MODEL", "text-embedding-005")
         st.success(f"✅ Embedding models initialized successfully (using {model_name})")
@@ -298,7 +296,13 @@ def main():
             if uploaded_file is not None:
                 image = Image.open(uploaded_file)
             elif image_url.strip():
-                image = download_image(image_url)
+                # Use the image_embedding_generator's download_image method instead
+                try:
+                    image = image_embedding_generator.download_image(image_url, convert_to_rgb=True, referer='https://www.zara.com/')
+                    if image is None:
+                        st.error("Failed to load image from URL")
+                except Exception as e:
+                    st.error(f"Error downloading image: {e}")
             
             if image:
                 with st.spinner("Analyzing image and searching for similar products..."):
