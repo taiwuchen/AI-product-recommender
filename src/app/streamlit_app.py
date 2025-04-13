@@ -245,7 +245,7 @@ def main():
     
     with tab1:
         st.header("Search by Text")
-        text_query = st.text_input("Enter your search query", "leather jacket with pockets", key="text_search_query")
+        text_query = st.text_input("Enter your search query", "", key="text_search_query")
         
         if st.button("Search by Text"):
             if text_query.strip():
