@@ -227,11 +227,4 @@ class ImageEmbeddingGenerator:
                 embeddings.append(random_embedding)
         
         return np.array(embeddings)
-    
-    def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
-        # Ensure embeddings are normalized
-        embedding1 = embedding1 / np.linalg.norm(embedding1)
-        embedding2 = embedding2 / np.linalg.norm(embedding2)
-        
-        # Compute cosine similarity
-        return float(np.dot(embedding1, embedding2))
+
