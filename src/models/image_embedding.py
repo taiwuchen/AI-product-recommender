@@ -190,41 +190,21 @@ class ImageEmbeddingGenerator:
             return np.array([])
             
         embeddings = []
-        valid_count = 0
         
         for i, url in enumerate(image_urls):
             if not url or not isinstance(url, str) or url.strip() == "":
-                # For empty URLs, create a unique random embedding based on the index
-                # This ensures different products get different embeddings even with missing images
-                
-                # Create a unique seed for each empty URL based on its index
+                # For empty URLs, create a unique random embedding
                 random_state = np.random.RandomState((i + 1) * 42)
                 random_embedding = random_state.randn(512).astype(np.float32)
-                
-                # Normalize the random embedding
                 norm = np.linalg.norm(random_embedding)
                 if norm > 0:
                     random_embedding = random_embedding / norm
-                    
                 embeddings.append(random_embedding)
                 continue
-                
-            try:
-                embedding = self.generate_image_embedding(url)
-                embeddings.append(embedding)
-                valid_count += 1
-            except Exception as e:
-                print(f"Error processing image from URL at index {i}: {e}")
-                # Add a random embedding to maintain alignment with input, but make it unique
-                random_state = np.random.RandomState((i + 1) * 99)
-                random_embedding = random_state.randn(512).astype(np.float32)
-                
-                # Normalize the random embedding
-                norm = np.linalg.norm(random_embedding)
-                if norm > 0:
-                    random_embedding = random_embedding / norm
-                    
-                embeddings.append(random_embedding)
+            
+            # Use the single image embedding method for each URL
+            embedding = self.generate_image_embedding(url)
+            embeddings.append(embedding)
         
         return np.array(embeddings)
 
