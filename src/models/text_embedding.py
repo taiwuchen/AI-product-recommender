@@ -43,9 +43,7 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
             try:
                 # Get project ID from environment or use the specified project ID
                 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "authentic-arch-456221-j3")
-                
                 print(f"Attempting to initialize Vertex AI with project: {project_id}, region: {self.vertex_ai_region}")
-                # Initialize Vertex AI with project and location
                 vertexai.init(project=project_id, location=self.vertex_ai_region)
                 
                 # Use the recommended text-embedding-005 model (gecko is being discontinued)
@@ -70,7 +68,6 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
     
     def generate_text_embedding(self, text: str) -> np.ndarray:
         if not text.strip():
-            # Return a zero vector for empty text
             print("Empty text provided, returning zero vector")
             return np.zeros(768, dtype=np.float32)  # Vertex AI embedding dimension
             
@@ -90,8 +87,7 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
             return np.array([])
             
         try:
-            # Process texts in batches - gecko allows larger batches
-            batch_size = 5  # Gecko model allows larger batches than text-embedding-large
+            batch_size = 5
             all_embeddings = []
             
             for i in range(0, len(texts), batch_size):
@@ -112,7 +108,7 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
                     # Replace None values with zero vectors
                     for j in range(len(batch_result)):
                         if batch_result[j] is None:
-                            batch_result[j] = np.zeros(768, dtype=np.float32)  # Embedding dimension
+                            batch_result[j] = np.zeros(768, dtype=np.float32)
                             
                     all_embeddings.extend(batch_result)
             
