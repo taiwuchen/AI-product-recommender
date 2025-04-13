@@ -7,12 +7,6 @@ from io import BytesIO
 from typing import List, Optional, Dict
 from transformers import CLIPProcessor, CLIPModel
 
-# Set fixed random seeds for reproducibility
-np.random.seed(42)
-torch.manual_seed(42)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed_all(42)
-
 class ImageEmbeddingGenerator:
     
     def __init__(self, 
@@ -110,98 +104,66 @@ class ImageEmbeddingGenerator:
         if cache_key in self.image_embedding_cache:
             return self.image_embedding_cache[cache_key]
             
-        try:
-            if self.clip_model is None or self.clip_processor is None:
-                raise ValueError("CLIP model or processor not initialized")
+        if self.clip_model is None or self.clip_processor is None:
+            raise ValueError("CLIP model or processor not initialized")
                 
-            # Preprocess the image
-            inputs = self.preprocess_image(image)
-            
-            # Generate embedding
-            with torch.no_grad():
-                image_features = self.clip_model.get_image_features(**inputs)
+        # Preprocess the image
+        inputs = self.preprocess_image(image)
+        
+        # Generate embedding
+        with torch.no_grad():
+            image_features = self.clip_model.get_image_features(**inputs)
                 
-            # Normalize the embedding
-            image_embeddings = image_features / image_features.norm(dim=1, keepdim=True)
-            
-            # Convert to numpy array
-            embedding = image_embeddings.cpu().numpy()[0]
-            
-            # Cache the result
-            self.image_embedding_cache[cache_key] = embedding
-            
-            return embedding
-        except Exception as e:
-            print(f"Error generating CLIP image embedding: {e}")
-            # Create a unique random embedding based on the image content
-            random_state = np.random.RandomState(image_hash % 2**32)
-            random_embedding = random_state.randn(512).astype(np.float32)
-            
-            # Normalize the random embedding
-            norm = np.linalg.norm(random_embedding)
-            if norm > 0:
-                random_embedding = random_embedding / norm
-                
-            # Cache the result
-            self.image_embedding_cache[cache_key] = random_embedding
-            
-            return random_embedding
+        # Normalize the embedding
+        image_embeddings = image_features / image_features.norm(dim=1, keepdim=True)
+        
+        # Convert to numpy array
+        embedding = image_embeddings.cpu().numpy()[0]
+        
+        # Cache the result
+        self.image_embedding_cache[cache_key] = embedding
+        
+        return embedding
     
     def generate_image_embedding(self, image_url: str) -> np.ndarray:
         # Return cached embedding if available
         if image_url in self.image_embedding_cache:
             return self.image_embedding_cache[image_url]
             
-        try:
-            # Download the image
-            image = self.download_image(image_url, convert_to_rgb=True)
+        # Download the image
+        image = self.download_image(image_url, convert_to_rgb=True)
+        
+        if image is None:
+            raise ValueError(f"Failed to download image from {image_url}")
             
-            if image is None:
-                raise ValueError(f"Failed to download image from {image_url}")
-                
-            # Generate embedding from the image
-            embedding = self.generate_embedding_from_pil_image(image)
-            
-            # Cache the result
-            self.image_embedding_cache[image_url] = embedding
-            
-            return embedding
-        except Exception as e:
-            print(f"Error generating image embedding: {e}")
-            # Create a deterministic random embedding based on the URL
-            random_state = np.random.RandomState(hash(image_url) % 2**32)
-            random_embedding = random_state.randn(512).astype(np.float32)
-            
-            # Normalize the random embedding
-            norm = np.linalg.norm(random_embedding)
-            if norm > 0:
-                random_embedding = random_embedding / norm
-                
-            # Cache the result
-            self.image_embedding_cache[image_url] = random_embedding
-            
-            return random_embedding
+        # Generate embedding from the image
+        embedding = self.generate_embedding_from_pil_image(image)
+        
+        # Cache the result
+        self.image_embedding_cache[image_url] = embedding
+        
+        return embedding
 
     def generate_batch_image_embeddings(self, image_urls: List[str]) -> np.ndarray:
         if not image_urls:
             return np.array([])
             
         embeddings = []
+        valid_indices = []
         
+        # First pass: process all valid URLs and keep track of their indices
         for i, url in enumerate(image_urls):
-            if not url or not isinstance(url, str) or url.strip() == "":
-                # For empty URLs, create a unique random embedding
-                random_state = np.random.RandomState((i + 1) * 42)
-                random_embedding = random_state.randn(512).astype(np.float32)
-                norm = np.linalg.norm(random_embedding)
-                if norm > 0:
-                    random_embedding = random_embedding / norm
-                embeddings.append(random_embedding)
-                continue
-            
-            # Use the single image embedding method for each URL
-            embedding = self.generate_image_embedding(url)
-            embeddings.append(embedding)
+            if url and isinstance(url, str) and url.strip():
+                try:
+                    embedding = self.generate_image_embedding(url)
+                    embeddings.append(embedding)
+                    valid_indices.append(i)
+                except Exception as e:
+                    print(f"Skipping URL {url} due to error: {e}")
         
+        # If we couldn't process any URLs, return empty array
+        if not embeddings:
+            return np.array([])
+            
         return np.array(embeddings)
 
