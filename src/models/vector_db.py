@@ -137,6 +137,12 @@ class VectorDatabase:
                 if keyword_scores:
                     sorted_results = sorted(keyword_scores.items(), key=lambda x: x[1], reverse=True)[:k]
                     
+                    # Print the new ranking after keyword boosting
+                    print("\nNew ranking after keyword boosting:")
+                    for rank, (idx, score) in enumerate(sorted_results):
+                        product_text = self.product_texts[idx][:100] + "..." if len(self.product_texts[idx]) > 100 else self.product_texts[idx]
+                        print(f"  {rank+1}. ID={idx}, Boosted Score={score:.4f}, Text: {product_text}")
+                    
                     # Convert to numpy arrays
                     new_indices = np.array([[idx for idx, _ in sorted_results]])
                     new_distances = np.array([[1.0 - score for _, score in sorted_results]])
@@ -167,10 +173,6 @@ class VectorDatabase:
             
         # Ensure query is float32
         query_embedding = query_embedding.astype(np.float32).reshape(1, -1)
-        
-        # Print query information for debugging
-        print(f"Searching in image index with {self.index_image.ntotal} items for top {k} results")
-        print(f"Query image embedding norm: {np.linalg.norm(query_embedding):.4f}")
         
         # Search index
         distances, indices = self.index_image.search(query_embedding, k)
