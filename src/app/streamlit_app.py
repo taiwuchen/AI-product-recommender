@@ -97,89 +97,97 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
 def generate_product_description(products: List[Dict], query: Optional[str] = None):
     if not products:
         return ""
-        
-    # Create description header
-    if query:
-        description = f"### Product Recommendations for '{query}'\n\n"
-    else:
-        description = "### Product Recommendations\n\n"
     
-    # Extract common characteristics
+    details_list = []
     categories = []
     materials = []
     features = []
     
     for product in products:
-        # Check that details is a string before calling .lower()
-        if 'details' in product and product['details'] and isinstance(product['details'], str):
-            details = product['details'].lower()
-            product_name = product.get('name', '').lower()
-            
-            # Check if query terms exist in product details or name
-            query_match = ""
-            if query:
-                query_terms = query.lower().split()
-                matches = []
-                for term in query_terms:
-                    if term in details or term in product_name:
-                        matches.append(term)
-                
-                if matches:
-                    query_match = f"These products match your search for '{query}' because they contain {', '.join(matches)}. "
-            
-            # Extract possible categories
-            if "bomber" in details or "bomber" in product_name:
+        name = product.get("name", "")
+        details = product.get("details", "")
+        details_list.append(f"Product Name: {name}\nProduct Details: {details}")
+        if details and isinstance(details, str):
+            details_lower = details.lower()
+            product_name_lower = name.lower()
+            if "bomber" in details_lower or "bomber" in product_name_lower:
                 categories.append("bomber")
-            elif "leather" in details or "leather" in product_name:
+            elif "leather" in details_lower or "leather" in product_name_lower:
                 categories.append("leather")
-            elif "denim" in details or "denim" in product_name:
+            elif "denim" in details_lower or "denim" in product_name_lower:
                 categories.append("denim")
-            elif "technical" in details or "technical" in product_name:
+            elif "technical" in details_lower or "technical" in product_name_lower:
                 categories.append("technical")
-            
-            # Extract possible materials
-            if "cotton" in details:
+            if "cotton" in details_lower:
                 materials.append("cotton")
-            elif "linen" in details:
+            elif "linen" in details_lower:
                 materials.append("linen")
-            elif "suede" in details:
+            elif "suede" in details_lower:
                 materials.append("suede")
-            elif "leather" in details:
-                if "faux" in details:
+            elif "leather" in details_lower:
+                if "faux" in details_lower:
                     materials.append("faux leather")
                 else:
                     materials.append("leather")
-            
-            # Extract possible features
-            if "zip" in details:
+            if "zip" in details_lower:
                 features.append("zip closure")
-            if "pocket" in details:
+            if "pocket" in details_lower:
                 features.append("pockets")
-            if "hood" in details:
+            if "hood" in details_lower:
                 features.append("hooded")
     
-    # Get unique values
     categories = list(set(categories))
     materials = list(set(materials))
     features = list(set(features))
     
-    # Build the description
-    if query:
-        description += query_match
-        
+    aggregated_info = "\n".join(details_list)
+    extra_info = ""
     if categories:
-        description += f"These recommendations focus on {', '.join(categories)} jackets "
-        if materials:
-            description += f"made with {', '.join(materials)} "
-        description += "that might suit your style. "
-    
+        extra_info += "Categories: " + ", ".join(categories) + "\n"
+    if materials:
+        extra_info += "Materials: " + ", ".join(materials) + "\n"
     if features:
-        description += f"Featured details include {', '.join(features)}. "
+        extra_info += "Features: " + ", ".join(features) + "\n"
     
-    description += "\n\nThese jackets share similar visual and functional characteristics, "
-    description += "offering you a selection of complementary styles that align with your preferences."
+    prompt = ""
+    if query:
+        prompt += f"User Query: {query}\n\n"
+    prompt += "Product Information:\n" + aggregated_info + "\n\n"
+    if extra_info:
+        prompt += "Additional Details:\n" + extra_info + "\n\n"
+    prompt += "Based on the above information, generate a Top 5 comprehensive, creative, and engaging product description and recommendation."
     
-    return description
+    import os
+    import requests
+    import json
+    API_KEY = os.environ.get('OPENROUTER_API_KEY')
+    
+    headers = {
+        "Authorization": "Bearer " + API_KEY,
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "deepseek/deepseek-chat-v3-0324:free",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ]
+    }
+    
+    try:
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, data=json.dumps(payload))
+    except Exception as e:
+        return f"Error during API call: {str(e)}"
+    
+    if response.status_code == 200:
+        try:
+            response_json = response.json()
+            result_text = response_json.get("choices", [{}])[0].get("message", {}).get("content", "")
+            return result_text if result_text else "No description generated."
+        except Exception as e:
+            return "Error parsing API response."
+    else:
+        return f"Error: {response.status_code} - {response.text}"
 
 def display_product(product):
     col1, col2 = st.columns([1, 3])
