@@ -201,11 +201,7 @@ class VectorDatabase:
     
     def save_indices(self, save_dir: str) -> None: 
         os.makedirs(save_dir, exist_ok=True)
-        
-        # Save text index
         faiss.write_index(self.index_text, os.path.join(save_dir, 'text_index.faiss'))
-        
-        # Save image index
         faiss.write_index(self.index_image, os.path.join(save_dir, 'image_index.faiss'))
         
         # Save product IDs and texts
@@ -221,14 +217,13 @@ class VectorDatabase:
             pickle.dump({'text': self.dimension_text, 'image': self.dimension_image}, f)
     
     def load_indices(self, save_dir: str) -> None:
-        # Try to load dimensions if available
         try:
             with open(os.path.join(save_dir, 'dimensions.pkl'), 'rb') as f:
                 dimensions = pickle.load(f)
                 self.dimension_text = dimensions.get('text', self.dimension_text)
                 self.dimension_image = dimensions.get('image', self.dimension_image)
         except (FileNotFoundError, EOFError):
-            # Backward compatibility - dimensions will be inferred from loaded indices
+            # Dimensions will be inferred from loaded indices
             pass
             
         # Load text index
