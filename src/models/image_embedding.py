@@ -64,7 +64,6 @@ class ImageEmbeddingGenerator:
                     print(f"Invalid URL '{image_url}': No scheme or host provided")
                     return None
                     
-            # Add headers to mimic a browser request
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
                 'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
@@ -98,46 +97,9 @@ class ImageEmbeddingGenerator:
         if hasattr(self, 'device'):
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
             
-        return inputs
-    
-    def generate_image_embedding(self, image_url: str) -> np.ndarray:
-        # Return cached embedding if available
-        if image_url in self.image_embedding_cache:
-            return self.image_embedding_cache[image_url]
-            
-        try:
-            # Download the image
-            image = self.download_image(image_url, convert_to_rgb=True)
-            
-            if image is None:
-                raise ValueError(f"Failed to download image from {image_url}")
-                
-            # Generate embedding from the image
-            embedding = self.generate_embedding_from_pil_image(image)
-            
-            # Cache the result
-            self.image_embedding_cache[image_url] = embedding
-            
-            return embedding
-        except Exception as e:
-            print(f"Error generating image embedding: {e}")
-            # Create a deterministic random embedding based on the URL
-            random_state = np.random.RandomState(hash(image_url) % 2**32)
-            random_embedding = random_state.randn(512).astype(np.float32)
-            
-            # Normalize the random embedding
-            norm = np.linalg.norm(random_embedding)
-            if norm > 0:
-                random_embedding = random_embedding / norm
-                
-            # Cache the result
-            self.image_embedding_cache[image_url] = random_embedding
-            
-            return random_embedding
+        return inputs 
     
     def generate_embedding_from_pil_image(self, image: Image.Image) -> np.ndarray:
-        # Create a hash of the image for caching
-        # Use a more robust method that captures image content rather than just bytes
         width, height = image.size
         small_image = image.resize((32, 32))  # Resize for consistent hashing
         pixels = list(small_image.getdata())
@@ -185,6 +147,41 @@ class ImageEmbeddingGenerator:
             
             return random_embedding
     
+    def generate_image_embedding(self, image_url: str) -> np.ndarray:
+        # Return cached embedding if available
+        if image_url in self.image_embedding_cache:
+            return self.image_embedding_cache[image_url]
+            
+        try:
+            # Download the image
+            image = self.download_image(image_url, convert_to_rgb=True)
+            
+            if image is None:
+                raise ValueError(f"Failed to download image from {image_url}")
+                
+            # Generate embedding from the image
+            embedding = self.generate_embedding_from_pil_image(image)
+            
+            # Cache the result
+            self.image_embedding_cache[image_url] = embedding
+            
+            return embedding
+        except Exception as e:
+            print(f"Error generating image embedding: {e}")
+            # Create a deterministic random embedding based on the URL
+            random_state = np.random.RandomState(hash(image_url) % 2**32)
+            random_embedding = random_state.randn(512).astype(np.float32)
+            
+            # Normalize the random embedding
+            norm = np.linalg.norm(random_embedding)
+            if norm > 0:
+                random_embedding = random_embedding / norm
+                
+            # Cache the result
+            self.image_embedding_cache[image_url] = random_embedding
+            
+            return random_embedding
+
     def generate_batch_image_embeddings(self, image_urls: List[str]) -> np.ndarray:
         if not image_urls:
             return np.array([])
