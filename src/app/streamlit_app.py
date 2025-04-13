@@ -58,14 +58,12 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
     # Delete existing indexes to force rebuild
     import shutil
     if os.path.exists(INDEXES_DIR):
-        print(f"Deleting existing indexes in {INDEXES_DIR}")
         try:
             # Delete all files in directory without removing directory
             for file_name in os.listdir(INDEXES_DIR):
                 file_path = os.path.join(INDEXES_DIR, file_name)
                 if os.path.isfile(file_path):
                     os.unlink(file_path)
-            print("Existing indexes deleted successfully")
         except Exception as e:
             print(f"Error deleting indexes: {e}")
     
@@ -74,31 +72,22 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
     
     with st.spinner('Building indexes. This may take a while...'):
         try:
-            print("Building new indexes")
             # Generate text embeddings
-            print(f"Generating text embeddings for {len(df)} products")
             text_embeddings = text_embedding_generator.generate_batch_text_embeddings(df['text_for_embedding'].tolist())
             print(f"Generated text embeddings shape: {text_embeddings.shape}")
             
             # Generate image embeddings
-            print(f"Generating image embeddings for {len(df)} products")
             image_embeddings = image_embedding_generator.generate_batch_image_embeddings(df['first_image_url'].tolist())
             print(f"Generated image embeddings shape: {image_embeddings.shape}")
             
             # Add embeddings to vector db
-            print("Adding text embeddings to vector DB")
             vector_db.add_text_embeddings(text_embeddings, list(range(len(df))))
-            print("Adding image embeddings to vector DB")
             vector_db.add_image_embeddings(image_embeddings, list(range(len(df))))
             
             # Store original text data for keyword filtering
-            print("Setting product texts")
             vector_db.set_product_texts(df['text_for_embedding'].tolist())
             
-            print(f"Final vector DB index stats: {vector_db.index_text.ntotal} text vectors, {len(vector_db.product_texts)} product texts")
-            
             # Save indexes
-            print(f"Saving indexes to {INDEXES_DIR}")
             vector_db.save_indices(INDEXES_DIR)
             st.success('Indexes built and saved successfully!')
         except Exception as e:
