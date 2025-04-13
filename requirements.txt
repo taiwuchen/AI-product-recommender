@@ -14,3 +14,4 @@ certifi
 urllib3
 torch
 transformers
+sentence-transformers
