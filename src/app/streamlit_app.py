@@ -15,7 +15,6 @@ from models.text_embedding import TextEmbeddingGenerator
 from models.image_embedding import ImageEmbeddingGenerator
 from models.vector_db import VectorDatabase
 
-# Constants
 DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
                          'ZARA_jackets_men.csv')
 INDEXES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'indexes')
@@ -252,7 +251,6 @@ def main():
             if text_query.strip():
                 with st.spinner("Searching..."):
                     try:
-                        # Generate text embedding for the query - using the same function for single text
                         query_embedding = text_embedding_generator.generate_text_embedding(text_query)
                         
                         # Search by text with keyword boosting enabled
