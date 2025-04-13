@@ -75,11 +75,9 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
             return np.zeros(768, dtype=np.float32)  # Vertex AI embedding dimension
             
         try:
-            print(f"Generating embedding for: '{text[:50]}...'")
             embeddings = self.text_embedding_model.get_embeddings([text])
             if embeddings and len(embeddings) > 0 and embeddings[0].values:
                 emb = np.array(embeddings[0].values)
-                print(f"Generated embedding with shape {emb.shape}")
                 return emb
             else:
                 raise ValueError("Empty embedding response from Vertex AI")
@@ -90,8 +88,6 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
     def generate_batch_text_embeddings(self, texts: List[str]) -> np.ndarray:
         if not texts:
             return np.array([])
-        
-        print(f"Generating batch embeddings for {len(texts)} texts")
             
         try:
             # Process texts in batches - gecko allows larger batches
@@ -103,9 +99,6 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
                 # Filter out empty strings to avoid API errors
                 valid_texts = [t for t in batch_texts if t.strip()]
                 valid_indices = [j for j, t in enumerate(batch_texts) if t.strip()]
-                
-                if i % 10 == 0:  # Only print progress every 10 items to reduce log clutter
-                    print(f"Processing batch {i//batch_size + 1}/{(len(texts)+batch_size-1)//batch_size}, valid texts: {len(valid_texts)}/{len(batch_texts)}")
                 
                 if valid_texts:
                     # Get embeddings for valid texts

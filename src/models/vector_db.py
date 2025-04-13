@@ -33,11 +33,9 @@ class VectorDatabase:
             # Create a new index with the correct dimension
             self.dimension_text = embeddings.shape[1]
             self.index_text = faiss.IndexFlatL2(self.dimension_text)
-            print(f"Created new text index with dimension {self.dimension_text}")
         elif len(self.product_ids) > 0:
             # If there are already product IDs, we're adding to an existing index
             # Reset the index to start fresh
-            print(f"Resetting text index to avoid duplicates. Old size: {self.index_text.ntotal}")
             self.index_text = faiss.IndexFlatL2(self.dimension_text)
             self.product_ids = []
             
@@ -58,10 +56,8 @@ class VectorDatabase:
             # Create a new index with the correct dimension
             self.dimension_image = embeddings.shape[1]
             self.index_image = faiss.IndexFlatL2(self.dimension_image)
-            print(f"Created new image index with dimension {self.dimension_image}")
         elif self.index_image.ntotal > 0:
             # If there are already vectors in the index, reset it to start fresh
-            print(f"Resetting image index to avoid duplicates. Old size: {self.index_image.ntotal}")
             self.index_image = faiss.IndexFlatL2(self.dimension_image)
             
         # Add to index
@@ -98,9 +94,6 @@ class VectorDatabase:
         if search_k <= 0:
             search_k = 1
             
-        print(f"Searching in index with {self.index_text.ntotal} items for top {search_k} results")
-        print(f"Query norm: {np.linalg.norm(query_embedding):.4f}")
-        
         # Search index
         distances, indices = self.index_text.search(query_embedding, search_k)
         
@@ -125,7 +118,6 @@ class VectorDatabase:
                 keyword_scores = {}
                 for i, idx in enumerate(indices[0]):
                     if idx >= len(self.product_texts):
-                        print(f"WARNING: Index {idx} out of range for product_texts (length: {len(self.product_texts)})")
                         continue
                         
                     text = self.product_texts[idx].lower()
@@ -149,14 +141,6 @@ class VectorDatabase:
                     new_indices = np.array([[idx for idx, _ in sorted_results]])
                     new_distances = np.array([[1.0 - score for _, score in sorted_results]])
                     
-                    print(f"\nBoosted search results:")
-                    for i, (idx, score) in enumerate(sorted_results):
-                        if idx < len(self.product_texts):
-                            product_text = self.product_texts[idx][:100] + "..." if len(self.product_texts[idx]) > 100 else self.product_texts[idx]
-                            print(f"  {i+1}. ID={idx}, Score={score:.4f}, Text: {product_text}")
-                        else:
-                            print(f"  {i+1}. ID={idx}, Score={score:.4f}, Text: <out of range>")
-                    
                     return new_distances, new_indices
         
         # Return original results if no keyword boosting or no keywords found
@@ -170,6 +154,11 @@ class VectorDatabase:
             print("WARNING: Image index is empty. No results can be returned.")
             return np.array([[0.0] * k]), np.array([[0] * k])
             
+        # Check product_ids also exists
+        if not self.product_ids:
+            print("WARNING: Product IDs list is empty. No results can be returned.")
+            return np.array([[0.0] * k]), np.array([[0] * k])
+            
         # Check if the embedding dimension matches the index
         if query_embedding.shape[0] != self.dimension_image:
             print(f"Warning: Query image embedding dimension mismatch. Expected {self.dimension_image}, got {query_embedding.shape[0]}.")
@@ -179,8 +168,34 @@ class VectorDatabase:
         # Ensure query is float32
         query_embedding = query_embedding.astype(np.float32).reshape(1, -1)
         
+        # Print query information for debugging
+        print(f"Searching in image index with {self.index_image.ntotal} items for top {k} results")
+        print(f"Query image embedding norm: {np.linalg.norm(query_embedding):.4f}")
+        
         # Search index
         distances, indices = self.index_image.search(query_embedding, k)
+        
+        # Convert distances to similarity scores (0-1 range where 1 is most similar)
+        # For L2 distance, lower is better, so we need to invert the scale
+        max_dist = np.max(distances) if np.max(distances) > 0 else 1.0
+        similarity_scores = 1.0 - (distances / max_dist)
+        
+        # Print detailed information about each result to help with debugging
+        print(f"\nImage search results:")
+        for i, idx in enumerate(indices[0]):
+            if idx < len(self.product_ids):
+                product_id = self.product_ids[idx]
+                # Add product text if available
+                product_text = ""
+                if idx < len(self.product_texts):
+                    product_text = self.product_texts[idx][:100] + "..." if len(self.product_texts[idx]) > 100 else self.product_texts[idx]
+                
+                print(f"  {i+1}. ID={product_id}, Distance={distances[0][i]:.4f}, " 
+                      f"Similarity Score={similarity_scores[0][i]:.4f}" +
+                      (f", Text: {product_text}" if product_text else ""))
+            else:
+                print(f"  {i+1}. ID=<out of range>, Distance={distances[0][i]:.4f}, "
+                      f"Similarity Score={similarity_scores[0][i]:.4f}")
         
         return distances, indices
     

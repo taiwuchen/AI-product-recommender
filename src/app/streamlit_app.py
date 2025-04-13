@@ -28,15 +28,20 @@ st.set_page_config(
     layout="wide"
 )
 
+# Global variables for models
+text_embedding_generator = None
+image_embedding_generator = None
+vector_db = None
+
 @st.cache_resource
 def load_data():
-    """Load and preprocess the product data."""
     loader = ProductDataLoader(DATA_PATH)
     return loader.preprocess_data(), loader
 
 @st.cache_resource
 def initialize_models():
-    """Initialize the embedding generators and vector database."""
+    global text_embedding_generator, image_embedding_generator, vector_db
+    
     # Create separate text and image embedding generators
     text_embedding_generator = TextEmbeddingGenerator(
         google_credentials_path=GOOGLE_CREDENTIALS_PATH
@@ -50,19 +55,15 @@ def initialize_models():
     return text_embedding_generator, image_embedding_generator, vector_db
 
 def build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db):
-    """Build or load vector indexes."""
-    
     # Delete existing indexes to force rebuild
     import shutil
     if os.path.exists(INDEXES_DIR):
-        print(f"Deleting existing indexes in {INDEXES_DIR}")
         try:
             # Delete all files in directory without removing directory
             for file_name in os.listdir(INDEXES_DIR):
                 file_path = os.path.join(INDEXES_DIR, file_name)
                 if os.path.isfile(file_path):
                     os.unlink(file_path)
-            print("Existing indexes deleted successfully")
         except Exception as e:
             print(f"Error deleting indexes: {e}")
     
@@ -71,31 +72,22 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
     
     with st.spinner('Building indexes. This may take a while...'):
         try:
-            print("Building new indexes")
             # Generate text embeddings
-            print(f"Generating text embeddings for {len(df)} products")
             text_embeddings = text_embedding_generator.generate_batch_text_embeddings(df['text_for_embedding'].tolist())
             print(f"Generated text embeddings shape: {text_embeddings.shape}")
             
             # Generate image embeddings
-            print(f"Generating image embeddings for {len(df)} products")
             image_embeddings = image_embedding_generator.generate_batch_image_embeddings(df['first_image_url'].tolist())
             print(f"Generated image embeddings shape: {image_embeddings.shape}")
             
             # Add embeddings to vector db
-            print("Adding text embeddings to vector DB")
             vector_db.add_text_embeddings(text_embeddings, list(range(len(df))))
-            print("Adding image embeddings to vector DB")
             vector_db.add_image_embeddings(image_embeddings, list(range(len(df))))
             
             # Store original text data for keyword filtering
-            print("Setting product texts")
             vector_db.set_product_texts(df['text_for_embedding'].tolist())
             
-            print(f"Final vector DB index stats: {vector_db.index_text.ntotal} text vectors, {len(vector_db.product_texts)} product texts")
-            
             # Save indexes
-            print(f"Saving indexes to {INDEXES_DIR}")
             vector_db.save_indices(INDEXES_DIR)
             st.success('Indexes built and saved successfully!')
         except Exception as e:
@@ -189,31 +181,19 @@ def generate_product_description(products: List[Dict], query: Optional[str] = No
     
     return description
 
-def download_image(image_url):
-    try:
-        # Add headers to mimic a browser request
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Referer': 'https://www.zara.com/'
-        }
-        response = requests.get(image_url, stream=True, headers=headers)
-        response.raise_for_status()
-        return Image.open(BytesIO(response.content))
-    except Exception as e:
-        st.error(f"Error downloading image: {e}")
-        return None
-
 def display_product(product):
-    """Display a product card."""
     col1, col2 = st.columns([1, 3])
     
     with col1:
-        image = download_image(product['image_url'])
-        if image:
-            st.image(image, use_container_width=True)
+        # Use the image_embedding_generator's download_image method instead
+        try:
+            image = image_embedding_generator.download_image(product['image_url'], convert_to_rgb=True, referer='https://www.zara.com/')
+            if image:
+                st.image(image, use_container_width=True)
+            else:
+                st.error("Failed to load image")
+        except Exception as e:
+            st.error(f"Error downloading image: {e}")
     
     with col2:
         st.subheader(product['name'])
@@ -237,6 +217,8 @@ def main():
     
     # Initialize models
     try:
+        # Use global variables
+        global text_embedding_generator, image_embedding_generator, vector_db
         text_embedding_generator, image_embedding_generator, vector_db = initialize_models()
         model_name = os.environ.get("VERTEX_EMBEDDING_MODEL", "text-embedding-005")
         st.success(f"✅ Embedding models initialized successfully (using {model_name})")
@@ -303,7 +285,13 @@ def main():
             if uploaded_file is not None:
                 image = Image.open(uploaded_file)
             elif image_url.strip():
-                image = download_image(image_url)
+                # Use the image_embedding_generator's download_image method instead
+                try:
+                    image = image_embedding_generator.download_image(image_url, convert_to_rgb=True, referer='https://www.zara.com/')
+                    if image is None:
+                        st.error("Failed to load image from URL")
+                except Exception as e:
+                    st.error(f"Error downloading image: {e}")
             
             if image:
                 with st.spinner("Analyzing image and searching for similar products..."):
