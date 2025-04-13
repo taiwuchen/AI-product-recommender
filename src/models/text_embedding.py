@@ -86,7 +86,6 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
                 raise RuntimeError(f"Failed to generate text embedding: {e}")
         
         elif isinstance(text, list):
-            # Handle batch case (previously generate_batch_text_embeddings)
             texts = text
             if not texts:
                 return np.array([])
