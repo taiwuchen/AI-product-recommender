@@ -281,24 +281,38 @@ def main():
     with tab2:
         st.header("Search by Image")
         
-        # Option 1: Upload an image
-        uploaded_file = st.file_uploader("Choose an image of a jacket", type=["jpg", "jpeg", "png"], key="image_search_uploader")
+        st.info("Please provide a single image using ONE of the methods below:")
         
-        # Option 2: Enter image URL
-        image_url = st.text_input("Or enter an image URL", key="image_search_url")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Option 1: Upload an image
+            uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"], key="image_search_uploader")
+        
+        with col2:
+            # Option 2: Enter image URL
+            image_url = st.text_input("Or enter an image URL", key="image_search_url")
         
         if st.button("Search by Image"):
             image = None
+            
+            # Check if both methods are used and warn the user
+            if uploaded_file is not None and image_url.strip():
+                st.warning("You've provided both an uploaded file and a URL. Only the uploaded file will be used.")
+                
+            # Process the uploaded file first if available
             if uploaded_file is not None:
                 image = Image.open(uploaded_file)
+            # Otherwise try the URL
             elif image_url.strip():
-                # Use the image_embedding_generator's download_image method instead
                 try:
                     image = image_embedding_generator.download_image(image_url, convert_to_rgb=True, referer='https://www.zara.com/')
                     if image is None:
                         st.error("Failed to load image from URL")
                 except Exception as e:
                     st.error(f"Error downloading image: {e}")
+            else:
+                st.warning("Please provide an image by uploading a file or entering a URL.")
             
             if image:
                 with st.spinner("Analyzing image and searching for similar products..."):
