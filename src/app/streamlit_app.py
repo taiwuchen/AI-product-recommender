@@ -72,8 +72,8 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
     
     with st.spinner('Building indexes. This may take a while...'):
         try:
-            # Generate text embeddings
-            text_embeddings = text_embedding_generator.generate_batch_text_embeddings(df['text_for_embedding'].tolist())
+            # Generate text embeddings - using the updated function with list input
+            text_embeddings = text_embedding_generator.generate_text_embedding(df['text_for_embedding'].tolist())
             print(f"Generated text embeddings shape: {text_embeddings.shape}")
             
             # Generate image embeddings
@@ -252,7 +252,7 @@ def main():
             if text_query.strip():
                 with st.spinner("Searching..."):
                     try:
-                        # Generate text embedding for the query
+                        # Generate text embedding for the query - using the same function for single text
                         query_embedding = text_embedding_generator.generate_text_embedding(text_query)
                         
                         # Search by text with keyword boosting enabled
