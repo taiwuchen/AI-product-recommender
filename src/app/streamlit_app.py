@@ -1,11 +1,10 @@
 import os
 import sys
 import streamlit as st
-import numpy as np
-from PIL import Image
 import requests
-from io import BytesIO
-from typing import List, Dict, Optional
+import json
+from PIL import Image
+from typing import Dict, Optional
 
 # Add parent directory to path to import modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -53,7 +52,6 @@ def initialize_models():
 
 def build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db):
     # Delete existing indexes to force rebuild
-    import shutil
     if os.path.exists(INDEXES_DIR):
         try:
             # Delete all files in directory without removing directory
@@ -169,9 +167,6 @@ def generate_product_description(product: Dict, query: Optional[str] = None):
     "- Machine-washable and shrink-resistant\n"
 )
     
-    import os
-    import requests
-    import json
     API_KEY = os.environ.get('OPENROUTER_API_KEY')
     
     headers = {
@@ -226,9 +221,6 @@ def main():
     st.title("AI Product Recommendation System")
     st.write("Search for fashion products using text or image!")
     
-    # Ensure indexes directory exists
-    os.makedirs(INDEXES_DIR, exist_ok=True)
-    
     # Load data
     try:
         df, loader = load_data()
@@ -239,7 +231,6 @@ def main():
     
     # Initialize models
     try:
-        # Use global variables
         global text_embedding_generator, image_embedding_generator, vector_db
         text_embedding_generator, image_embedding_generator, vector_db = initialize_models()
         model_name = os.environ.get("VERTEX_EMBEDDING_MODEL", "text-embedding-005")
@@ -268,21 +259,15 @@ def main():
                 with st.spinner("Searching and generating description..."):
                     try:
                         query_embedding = text_embedding_generator.generate_text_embedding(text_query)
-                        
-                        # Search by text with keyword boosting enabled
                         distances, indices = vector_db.search_by_text(
                             query_embedding, k=5, query_text=text_query, keyword_boost=True)
                         
-                        # Display results
                         st.subheader("Results")
-                        
-                        # Get product details
                         products = loader.get_product_details(indices[0].tolist())
                         
                         if not products:
                             st.warning("No products found matching your query.")
                         else:
-                            # Display product cards
                             for product in products:
                                 st.divider()
                                 display_product(product)
@@ -306,15 +291,12 @@ def main():
         
         if st.button("Search by Image"):
             image = None
-            
-            # Check if both methods are used and warn the user
+
             if uploaded_file is not None and image_url.strip():
                 st.warning("You've provided both an uploaded file and a URL. Only the uploaded file will be used.")
                 
-            # Process the uploaded file first if available
             if uploaded_file is not None:
                 image = Image.open(uploaded_file)
-            # Otherwise try the URL
             elif image_url.strip():
                 try:
                     image = image_embedding_generator.download_image(image_url, convert_to_rgb=True, referer='https://www.zara.com/')
@@ -328,22 +310,15 @@ def main():
             if image:
                 with st.spinner("Analyzing image and searching for similar products..."):
                     try:
-                        # Generate image embedding using CLIP
                         query_embedding = image_embedding_generator.generate_embedding_from_pil_image(image)
-                        
-                        # Search by image
                         distances, indices = vector_db.search_by_image(query_embedding, k=5)
                         
-                        # Display results
                         st.subheader("Results")
-                        
-                        # Get product details
                         products = loader.get_product_details(indices[0].tolist())
                         
                         if not products:
                             st.warning("No products found matching your image.")
                         else:
-                            # Display product cards
                             for product in products:
                                 st.divider()
                                 display_product(product)
