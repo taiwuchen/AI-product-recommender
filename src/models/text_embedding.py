@@ -3,25 +3,27 @@ from typing import List, Optional, Union, Dict
 import os
 import vertexai
 from vertexai.language_models import TextEmbeddingModel
-from dotenv import load_dotenv
 from google.cloud import aiplatform
 from google.oauth2 import service_account
+
+
+PROJECT_ID = "authentic-arch-456221-j3"
+REGION = "us-central1"
+MODEL_ID = "text-embedding-005" # Use the recommended text-embedding-005 model (gecko is being discontinued)
 
 # Base class moved from base_embedding.py
 class BaseEmbeddingGenerator:
     
     def __init__(self, google_credentials_path: Optional[str] = None, vertex_ai_region: Optional[str] = None):
-        load_dotenv()
         # Initialize Google Cloud credentials
         self.credentials = None
         self.initialized = False
-        self.vertex_ai_region = vertex_ai_region or os.environ.get("VERTEX_AI_REGION", "us-central1")
+        self.vertex_ai_region = vertex_ai_region or REGION
         
         try:
             if google_credentials_path and os.path.exists(google_credentials_path):
                 self.credentials = service_account.Credentials.from_service_account_file(google_credentials_path)
-                aiplatform.init(credentials=self.credentials, project=os.environ.get("GOOGLE_CLOUD_PROJECT"), 
-                               location=self.vertex_ai_region)
+                aiplatform.init(credentials=self.credentials, project=PROJECT_ID, location=self.vertex_ai_region)
                 self.initialized = True
             else:
                 # Use default credentials if path not provided or file doesn't exist
@@ -44,13 +46,11 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
         
         if self.initialized:
             try:
-                # Get project ID from environment or use the specified project ID
-                project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "authentic-arch-456221-j3")
+                project_id = PROJECT_ID
                 print(f"Attempting to initialize Vertex AI with project: {project_id}, region: {self.vertex_ai_region}")
                 vertexai.init(project=project_id, location=self.vertex_ai_region)
-                
-                # Use the recommended text-embedding-005 model (gecko is being discontinued)
-                model_id = os.environ.get("VERTEX_EMBEDDING_MODEL", "text-embedding-005")
+
+                model_id = MODEL_ID
                 
                 print(f"Initializing Vertex AI Text-Embeddings API with project: {project_id} and model: {model_id}")
                 # Initialize the Vertex AI Embedding model directly using the provided structure
@@ -70,7 +70,6 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
             raise RuntimeError("Failed to authenticate with Google Cloud")
     
     def generate_text_embedding(self, text: Union[str, List[str]]) -> np.ndarray:
-        # Handle empty input cases
         if isinstance(text, str):
             if not text.strip():
                 print("Empty text provided, returning zero vector")

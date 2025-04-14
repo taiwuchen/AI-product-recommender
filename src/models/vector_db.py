@@ -23,19 +23,16 @@ class VectorDatabase:
     def add_text_embeddings(self, embeddings: np.ndarray, ids: List[int]) -> None:
         if len(embeddings) == 0:
             return
-            
-        # Ensure embeddings are float32
+
         embeddings = embeddings.astype(np.float32)
         
         # Check if the embedding dimension matches the index
         if embeddings.shape[1] != self.dimension_text:
             print(f"Warning: Embedding dimension mismatch. Expected {self.dimension_text}, got {embeddings.shape[1]}.")
-            # Create a new index with the correct dimension
             self.dimension_text = embeddings.shape[1]
             self.index_text = faiss.IndexFlatL2(self.dimension_text)
         elif len(self.product_ids) > 0:
-            # If there are already product IDs, we're adding to an existing index
-            # Reset the index to start fresh
+            # If there are already product IDs, add to an existing index
             self.index_text = faiss.IndexFlatL2(self.dimension_text)
             self.product_ids = []
             
@@ -46,14 +43,12 @@ class VectorDatabase:
     def add_image_embeddings(self, embeddings: np.ndarray, ids: List[int]) -> None:
         if len(embeddings) == 0:
             return
-            
-        # Ensure embeddings are float32
+
         embeddings = embeddings.astype(np.float32)
         
         # Check if the embedding dimension matches the index
         if embeddings.shape[1] != self.dimension_image:
             print(f"Warning: Image embedding dimension mismatch. Expected {self.dimension_image}, got {embeddings.shape[1]}.")
-            # Create a new index with the correct dimension
             self.dimension_image = embeddings.shape[1]
             self.index_image = faiss.IndexFlatL2(self.dimension_image)
         elif self.index_image.ntotal > 0:
@@ -68,12 +63,10 @@ class VectorDatabase:
         
     def search_by_text(self, query_embedding: np.ndarray, k: int = 5, 
                        query_text: Optional[str] = None, keyword_boost: bool = True) -> Tuple[np.ndarray, np.ndarray]:
-        # Check if index is empty
         if self.index_text.ntotal == 0:
             print("WARNING: Text index is empty. No results can be returned.")
             return np.array([[0.0] * k]), np.array([[0] * k])
             
-        # Check product_ids also exists
         if not self.product_ids:
             print("WARNING: Product IDs list is empty. No results can be returned.")
             return np.array([[0.0] * k]), np.array([[0] * k])
@@ -81,10 +74,8 @@ class VectorDatabase:
         # Check if the embedding dimension matches the index
         if query_embedding.shape[0] != self.dimension_text:
             print(f"Warning: Query embedding dimension mismatch. Expected {self.dimension_text}, got {query_embedding.shape[0]}.")
-            # We can't search with mismatched dimensions, so we need to return empty results
             return np.array([[0.0] * k]), np.array([[0] * k])
             
-        # Ensure query is float32
         query_embedding = query_embedding.astype(np.float32).reshape(1, -1)
         
         # Get more results than needed for filtering
@@ -108,13 +99,11 @@ class VectorDatabase:
                     print(f"  {i+1}. ID={idx}, Distance={distances[0][i]:.4f}, Text: <out of range>")
         
         if keyword_boost and query_text and len(self.product_texts) > 0:
-            # Extract important keywords from query (simple approach)
             keywords = [kw.lower() for kw in query_text.split() if len(kw) > 2]
             
             print(f"\nKeywords for boosting: {keywords}")
             
             if keywords:
-                # Score based on keyword presence
                 keyword_scores = {}
                 for i, idx in enumerate(indices[0]):
                     if idx >= len(self.product_texts):
@@ -155,20 +144,16 @@ class VectorDatabase:
         return distances, indices[:, :result_k]
     
     def search_by_image(self, query_embedding: np.ndarray, k: int = 5) -> Tuple[np.ndarray, np.ndarray]:
-        # Check if index is empty
         if self.index_image.ntotal == 0:
             print("WARNING: Image index is empty. No results can be returned.")
             return np.array([[0.0] * k]), np.array([[0] * k])
             
-        # Check product_ids also exists
         if not self.product_ids:
             print("WARNING: Product IDs list is empty. No results can be returned.")
             return np.array([[0.0] * k]), np.array([[0] * k])
             
-        # Check if the embedding dimension matches the index
         if query_embedding.shape[0] != self.dimension_image:
             print(f"Warning: Query image embedding dimension mismatch. Expected {self.dimension_image}, got {query_embedding.shape[0]}.")
-            # We can't search with mismatched dimensions, so we need to return empty results
             return np.array([[0.0] * k]), np.array([[0] * k])
             
         # Ensure query is float32
@@ -177,17 +162,15 @@ class VectorDatabase:
         # Search index
         distances, indices = self.index_image.search(query_embedding, k)
         
-        # Convert distances to similarity scores (0-1 range where 1 is most similar)
         # For L2 distance, lower is better, so we need to invert the scale
         max_dist = np.max(distances) if np.max(distances) > 0 else 1.0
         similarity_scores = 1.0 - (distances / max_dist)
         
-        # Print detailed information about each result to help with debugging
+        # Print detailed information about each result
         print(f"\nImage search results:")
         for i, idx in enumerate(indices[0]):
             if idx < len(self.product_ids):
                 product_id = self.product_ids[idx]
-                # Add product text if available
                 product_text = ""
                 if idx < len(self.product_texts):
                     product_text = self.product_texts[idx][:100] + "..." if len(self.product_texts[idx]) > 100 else self.product_texts[idx]
@@ -251,5 +234,4 @@ class VectorDatabase:
             with open(os.path.join(save_dir, 'product_texts.pkl'), 'rb') as f:
                 self.product_texts = pickle.load(f)
         except (FileNotFoundError, EOFError):
-            # Backward compatibility
             self.product_texts = []
