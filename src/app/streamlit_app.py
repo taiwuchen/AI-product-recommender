@@ -91,53 +91,50 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
             st.error(f"Failed to build indexes: {e}")
             raise RuntimeError(f"Index building failed: {e}")
 
-def generate_product_description(products: List[Dict], query: Optional[str] = None):
-    if not products:
+def generate_product_description(product: Dict, query: Optional[str] = None):
+    """Generate a description for a single product"""
+    if not product:
         return ""
     
-    details_list = []
+    name = product.get("name", "")
+    details = product.get("details", "")
+    
+    # Extract categories, materials, and features
     categories = []
     materials = []
     features = []
     
-    for product in products:
-        name = product.get("name", "")
-        details = product.get("details", "")
-        details_list.append(f"Product Name: {name}\nProduct Details: {details}")
-        if details and isinstance(details, str):
-            details_lower = details.lower()
-            product_name_lower = name.lower()
-            if "bomber" in details_lower or "bomber" in product_name_lower:
-                categories.append("bomber")
-            elif "leather" in details_lower or "leather" in product_name_lower:
-                categories.append("leather")
-            elif "denim" in details_lower or "denim" in product_name_lower:
-                categories.append("denim")
-            elif "technical" in details_lower or "technical" in product_name_lower:
-                categories.append("technical")
-            if "cotton" in details_lower:
-                materials.append("cotton")
-            elif "linen" in details_lower:
-                materials.append("linen")
-            elif "suede" in details_lower:
-                materials.append("suede")
-            elif "leather" in details_lower:
-                if "faux" in details_lower:
-                    materials.append("faux leather")
-                else:
-                    materials.append("leather")
-            if "zip" in details_lower:
-                features.append("zip closure")
-            if "pocket" in details_lower:
-                features.append("pockets")
-            if "hood" in details_lower:
-                features.append("hooded")
+    if details and isinstance(details, str):
+        details_lower = details.lower()
+        product_name_lower = name.lower()
+        if "bomber" in details_lower or "bomber" in product_name_lower:
+            categories.append("bomber")
+        elif "leather" in details_lower or "leather" in product_name_lower:
+            categories.append("leather")
+        elif "denim" in details_lower or "denim" in product_name_lower:
+            categories.append("denim")
+        elif "technical" in details_lower or "technical" in product_name_lower:
+            categories.append("technical")
+        if "cotton" in details_lower:
+            materials.append("cotton")
+        elif "linen" in details_lower:
+            materials.append("linen")
+        elif "suede" in details_lower:
+            materials.append("suede")
+        elif "leather" in details_lower:
+            if "faux" in details_lower:
+                materials.append("faux leather")
+            else:
+                materials.append("leather")
+        if "zip" in details_lower:
+            features.append("zip closure")
+        if "pocket" in details_lower:
+            features.append("pockets")
+        if "hood" in details_lower:
+            features.append("hooded")
     
-    categories = list(set(categories))
-    materials = list(set(materials))
-    features = list(set(features))
-    
-    aggregated_info = "\n".join(details_list)
+    # Build product info
+    product_info = f"Product Name: {name}\nProduct Details: {details}"
     extra_info = ""
     if categories:
         extra_info += "Categories: " + ", ".join(categories) + "\n"
@@ -146,26 +143,46 @@ def generate_product_description(products: List[Dict], query: Optional[str] = No
     if features:
         extra_info += "Features: " + ", ".join(features) + "\n"
     
+    # Build prompt
     prompt = ""
     if query:
         prompt += f"User Query: {query}\n\n"
-    prompt += "Product Information:\n" + aggregated_info + "\n\n"
+    prompt += "Product Information:\n" + product_info + "\n\n"
     if extra_info:
         prompt += "Additional Details:\n" + extra_info + "\n\n"
-    prompt += "Based on the above information, generate a Top 5 comprehensive, creative, and engaging product description and recommendation."
+    prompt += (
+    "Fill in the following format by writing only inside the brackets [] (but do not include the brackets in the output). Follow the structure exactly.\n\n"
+    "Format:\n"
+    "Gemini Generated Description:\n\n"
+    "[Write a creative, engaging product description of around 30 words.]\n\n"
+    "Key Features:\n"
+    "- [Feature 1]\n"
+    "- [Feature 2]\n"
+    "- [Feature 3]\n"
+    
+    "Example:\n"
+    "Gemini Generated Description:\n\n"
+    "This ultra-soft hoodie blends comfort with street style—perfect for chilly evenings or laid-back weekends. Made from recycled fibers, it’s cozy, breathable, and eco-conscious.\n\n"
+    "Key Features:\n"
+    "- Made with 100% recycled materials\n"
+    "- Unisex design with relaxed fit\n"
+    "- Machine-washable and shrink-resistant\n"
+)
     
     import os
     import requests
     import json
-    API_KEY = "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"
+    API_KEY = "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"
     
     headers = {
         "Authorization": "Bearer " + API_KEY,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://ai-product-recommender.app", 
+        "X-Title": "AI Product Recommender"
     }
     
     payload = {
-        "model": "deepseek/deepseek-chat-v3-0324:free",
+        "model": "google/gemini-2.0-flash-lite-001",
         "messages": [
             {"role": "user", "content": prompt}
         ]
@@ -203,6 +220,7 @@ def display_product(product):
         st.subheader(product['name'])
         st.write(product['details'])
         st.write(f"[View on ZARA]({product['link']})")
+        st.markdown(generate_product_description(product))
 
 def main():
     st.title("AI Product Recommendation System")
@@ -264,9 +282,6 @@ def main():
                         if not products:
                             st.warning("No products found matching your query.")
                         else:
-                            # Display product description
-                            st.markdown(generate_product_description(products, text_query))
-                            
                             # Display product cards
                             for product in products:
                                 st.divider()
@@ -328,9 +343,6 @@ def main():
                         if not products:
                             st.warning("No products found matching your image.")
                         else:
-                            # Display product description
-                            st.markdown(generate_product_description(products, "your image"))
-                            
                             # Display product cards
                             for product in products:
                                 st.divider()
