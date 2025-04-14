@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 import os
 import vertexai
 from vertexai.language_models import TextEmbeddingModel
@@ -37,6 +37,9 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
     def __init__(self, google_credentials_path: Optional[str] = None, vertex_ai_region: Optional[str] = None):
         super().__init__(google_credentials_path, vertex_ai_region)
         
+        # Initialize text embedding cache
+        self.text_embedding_cache: Dict[str, np.ndarray] = {}
+        
         print(f"TextEmbeddingGenerator initialization: credentials path={google_credentials_path}, region={self.vertex_ai_region}")
         
         if self.initialized:
@@ -73,11 +76,16 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
                 print("Empty text provided, returning zero vector")
                 return np.zeros(768, dtype=np.float32)  # Vertex AI embedding dimension
             
+            # Check cache first
+            if text in self.text_embedding_cache:
+                return self.text_embedding_cache[text]
+            
             # Single text case
             try:
                 embeddings = self.text_embedding_model.get_embeddings([text])
                 if embeddings and len(embeddings) > 0 and embeddings[0].values:
                     emb = np.array(embeddings[0].values)
+                    self.text_embedding_cache[text] = emb
                     return emb
                 else:
                     raise ValueError("Empty embedding response from Vertex AI")
@@ -96,25 +104,31 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
                 
                 for i in range(0, len(texts), batch_size):
                     batch_texts = texts[i:i+batch_size]
-                    # Filter out empty strings to avoid API errors
-                    valid_texts = [t for t in batch_texts if t.strip()]
-                    valid_indices = [j for j, t in enumerate(batch_texts) if t.strip()]
+                    # Filter out empty strings and check cache first
+                    new_texts = []
+                    new_texts_indices = []
+                    cached_results = [None] * len(batch_texts)
                     
-                    if valid_texts:
-                        # Get embeddings for valid texts
-                        batch_embeddings = self.text_embedding_model.get_embeddings(valid_texts)
+                    for j, t in enumerate(batch_texts):
+                        if not t.strip():
+                            cached_results[j] = np.zeros(768, dtype=np.float32)
+                        elif t in self.text_embedding_cache:
+                            cached_results[j] = self.text_embedding_cache[t]
+                        else:
+                            new_texts.append(t)
+                            new_texts_indices.append(j)
+                    
+                    if new_texts:
+                        # Get embeddings only for texts not in cache
+                        batch_embeddings = self.text_embedding_model.get_embeddings(new_texts)
                         
-                        # Realign with original indices (including empty strings)
-                        batch_result = [None] * len(batch_texts)
-                        for idx, emb in zip(valid_indices, batch_embeddings):
-                            batch_result[idx] = np.array(emb.values if hasattr(emb, 'values') else emb)
-                            
-                        # Replace None values with zero vectors
-                        for j in range(len(batch_result)):
-                            if batch_result[j] is None:
-                                batch_result[j] = np.zeros(768, dtype=np.float32)
-                                
-                        all_embeddings.extend(batch_result)
+                        # Add new embeddings to cache and results
+                        for idx, (txt, emb) in enumerate(zip(new_texts, batch_embeddings)):
+                            embedding_array = np.array(emb.values if hasattr(emb, 'values') else emb)
+                            cached_results[new_texts_indices[idx]] = embedding_array
+                            self.text_embedding_cache[txt] = embedding_array
+                    
+                    all_embeddings.extend(cached_results)
                 
                 stacked = np.array(all_embeddings)
                 print(f"✅ Generated {len(all_embeddings)} embeddings with shape: {stacked.shape}")
