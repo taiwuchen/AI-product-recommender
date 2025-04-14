@@ -149,7 +149,7 @@ def generate_product_description(product: Dict, query: Optional[str] = None):
     if extra_info:
         prompt += "Additional Details:\n" + extra_info + "\n\n"
     prompt += (
-    "Fill in the following format by writing only inside the brackets [] (but do not include the brackets in the output). Follow the structure exactly.\n\n"
+    "Fill in the following format by writing only inside the brackets [] (but do not include the brackets in the output). Use bold font for key words. Follow the structure exactly.\n\n"
     "Format:\n"
     "Gemini Generated Description:\n\n"
     "[Write a creative, engaging product description of around 30 words.]\n\n"
