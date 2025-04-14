@@ -21,12 +21,9 @@ class ImageEmbeddingGenerator:
     def _load_clip_model(self):
         try:
             print(f"Loading CLIP model: {self.clip_model_name}...")
-            
-            # Load the CLIP model and processor
             self.clip_processor = CLIPProcessor.from_pretrained(self.clip_model_name)
             self.clip_model = CLIPModel.from_pretrained(self.clip_model_name)
-            
-            # Check if CUDA is available and move model to GPU if possible
+
             if torch.cuda.is_available():
                 self.clip_model = self.clip_model.to("cuda")
                 self.device = "cuda"
@@ -40,7 +37,6 @@ class ImageEmbeddingGenerator:
     
     def download_image(self, image_url: str, convert_to_rgb: bool = True, referer: str = 'https://www.google.com/') -> Optional[Image.Image]:
         try:
-            # Check if URL is valid before making a request
             if not image_url or not isinstance(image_url, str):
                 print(f"Invalid URL: {image_url}")
                 return None
