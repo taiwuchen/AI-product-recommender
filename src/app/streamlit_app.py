@@ -45,10 +45,8 @@ def initialize_models():
     text_embedding_generator = TextEmbeddingGenerator(
         google_credentials_path=GOOGLE_CREDENTIALS_PATH
     )
-    
-    image_embedding_generator = ImageEmbeddingGenerator(
-        google_credentials_path=GOOGLE_CREDENTIALS_PATH
-    )
+
+    image_embedding_generator = ImageEmbeddingGenerator()
     
     vector_db = VectorDatabase()
     return text_embedding_generator, image_embedding_generator, vector_db

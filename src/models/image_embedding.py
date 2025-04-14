@@ -10,8 +10,6 @@ from transformers import CLIPProcessor, CLIPModel
 class ImageEmbeddingGenerator:
     
     def __init__(self, 
-                 google_credentials_path: Optional[str] = None, 
-                 vertex_ai_region: Optional[str] = None,
                  clip_model_name: str = "openai/clip-vit-base-patch32"):
 
         self.clip_model_name = clip_model_name
