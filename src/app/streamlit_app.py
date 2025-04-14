@@ -150,20 +150,39 @@ def generate_product_description(product: Dict, query: Optional[str] = None):
     prompt += "Product Information:\n" + product_info + "\n\n"
     if extra_info:
         prompt += "Additional Details:\n" + extra_info + "\n\n"
-    prompt += "Generate a concise, creative, and engaging product description highlighting the key features and benefits. Keep it under 150 words."
+    prompt += (
+    "Fill in the following format by writing only inside the brackets [] (but do not include the brackets in the output). Follow the structure exactly.\n\n"
+    "Format:\n"
+    "Gemini Generated Description:\n\n"
+    "[Write a creative, engaging product description of around 30 words.]\n\n"
+    "Key Features:\n"
+    "- [Feature 1]\n"
+    "- [Feature 2]\n"
+    "- [Feature 3]\n"
+    
+    "Example:\n"
+    "Gemini Generated Description:\n\n"
+    "This ultra-soft hoodie blends comfort with street style—perfect for chilly evenings or laid-back weekends. Made from recycled fibers, it’s cozy, breathable, and eco-conscious.\n\n"
+    "Key Features:\n"
+    "- Made with 100% recycled materials\n"
+    "- Unisex design with relaxed fit\n"
+    "- Machine-washable and shrink-resistant\n"
+)
     
     import os
     import requests
     import json
-    API_KEY = "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"
+    API_KEY = "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"
     
     headers = {
         "Authorization": "Bearer " + API_KEY,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://ai-product-recommender.app", 
+        "X-Title": "AI Product Recommender"
     }
     
     payload = {
-        "model": "deepseek/deepseek-chat-v3-0324:free",
+        "model": "google/gemini-2.0-flash-lite-001",
         "messages": [
             {"role": "user", "content": prompt}
         ]
