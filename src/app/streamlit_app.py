@@ -247,7 +247,7 @@ def main():
         
         if st.button("Search by Text"):
             if text_query.strip():
-                with st.spinner("Searching..."):
+                with st.spinner("Searching and generating description..."):
                     try:
                         query_embedding = text_embedding_generator.generate_text_embedding(text_query)
                         

@@ -15,9 +15,8 @@ class ImageEmbeddingGenerator:
         self.clip_model_name = clip_model_name
         self._load_clip_model()
         
-        # Initialize embedding caches
+        # Initialize embedding cache
         self.image_embedding_cache: Dict[str, np.ndarray] = {}
-        self.text_embedding_cache: Dict[str, np.ndarray] = {}
     
     def _load_clip_model(self):
         try:
