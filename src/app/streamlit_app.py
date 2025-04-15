@@ -36,7 +36,8 @@ if os.path.exists(css_path):
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.markdown("## 👕 AI Product Recommender")
+    st.markdown("**Introduction**")
+    st.markdown("---")
     st.markdown(
         "Welcome! This app helps you find fashion products using **text** or **image** search powered by AI.\n\n"
         "- Use the **Text Search** tab to describe what you want.\n"
@@ -44,8 +45,7 @@ with st.sidebar:
         "Results are enhanced with AI-generated descriptions."
     )
     st.markdown("---")
-    st.markdown("Made with ❤️ using [Streamlit](https://streamlit.io/)")
-    st.markdown("[GitHub Repo](https://github.com/taiwuchen/AI-product-recommender)")
+    st.markdown("More Coming Soon...")
 
 # Global variables for models
 text_embedding_generator = None
@@ -154,13 +154,12 @@ def display_product(product, similar_products=None, query=None):
 
 def main():
     st.markdown(
-        "<h1 class='app-title'>👕 AI Product Recommendation System</h1>",
+        "<h1 class='app-title'>👕 AI Product Recommender</h1>",
         unsafe_allow_html=True
     )
     st.markdown(
         "<div class='app-desc'>"
         "Search for fashion products using <b>text</b> or <b>image</b>!<br>"
-        "Powered by AI and RAG."
         "</div>",
         unsafe_allow_html=True
     )
@@ -201,16 +200,13 @@ def main():
     )
 
     with tab1:
-        st.header("🔤 Search by Text")
-        st.markdown("Describe the product you want. For example: *'black bomber jacket with zipper pockets'*")
+        st.header("Search by Text")
         text_query = st.text_input(
             "Enter your search query",
-            "",
             key="text_search_query",
-            help="Describe the product you are looking for (e.g., color, style, features)."
         )
 
-        if st.button("Search by Text", help="Click to search for products matching your description."):
+        if st.button("Search by Text"):
             if text_query.strip():
                 with st.spinner("Searching and generating description..."):
                     try:
@@ -228,7 +224,7 @@ def main():
                         st.error(f"❌ Search failed: {e}")
 
     with tab2:
-        st.header("🖼️ Search by Image")
+        st.header("Search by Image")
         st.markdown("Find similar products by uploading an image or providing an image URL.")
 
         st.info("Please provide a single image using **one** of the methods below:")
@@ -287,8 +283,8 @@ def main():
     st.markdown(
         "<hr class='app-footer-hr'>"
         "<div class='app-footer'>"
-        "AI Product Recommender &copy; 2025 &mdash; Built with Streamlit | "
-        "<a href='https://github.com/your-repo-link' target='_blank'>GitHub</a>"
+        "AI Product Recommender &copy; 2025 &mdash; Built with Streamlit by Taiwu Chen | "
+        "<a href='https://github.com/taiwuchen/AI-product-recommender' target='_blank'>GitHub</a>"
         "</div>",
         unsafe_allow_html=True
     )
