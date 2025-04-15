@@ -213,7 +213,6 @@ def main():
 
     with tab2:
         st.header("Search by Image")
-        st.markdown("Find similar products by uploading an image or providing an image URL.")
 
         st.info("Please provide a single image using **one** of the methods below:")
 
@@ -224,7 +223,6 @@ def main():
                 "Upload an image",
                 type=["jpg", "jpeg", "png"],
                 key="image_search_uploader",
-                help="Upload a product image from your device."
             )
 
         with col2:
