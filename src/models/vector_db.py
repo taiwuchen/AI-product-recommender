@@ -9,15 +9,9 @@ class VectorDatabase:
     def __init__(self, dimension_text: int = 768, dimension_image: int = 512):
         self.dimension_text = dimension_text
         self.dimension_image = dimension_image
-        
-        # Initialize indices
         self.index_text = faiss.IndexFlatL2(dimension_text)
         self.index_image = faiss.IndexFlatL2(dimension_image)
-        
-        # Keep track of product ids
         self.product_ids = []
-        
-        # Store original data for keyword filtering
         self.product_texts = []
         
     def add_text_embeddings(self, embeddings: np.ndarray, ids: List[int]) -> None:
