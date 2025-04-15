@@ -62,25 +62,17 @@ def load_data():
 def initialize_models():
     global text_embedding_generator, image_embedding_generator, vector_db, rag_generator
     
-    # Create separate text and image embedding generators
     text_embedding_generator = TextEmbeddingGenerator(
         google_credentials_path=GOOGLE_CREDENTIALS_PATH
     )
-
     image_embedding_generator = ImageEmbeddingGenerator()
-    
     vector_db = VectorDatabase()
-    
-    # Load data for the RAG generator
     _, loader = load_data()
-    
-    # Initialize the RAG generator with vector_db, loader, and API key
     rag_generator = RAGGenerator(vector_db=vector_db, product_loader=loader, api_key=API_KEY)
     
     return text_embedding_generator, image_embedding_generator, vector_db, rag_generator
 
 def build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db):
-    # Delete existing indexes to force rebuild
     if os.path.exists(INDEXES_DIR):
         try:
             # Delete all files in directory without removing directory
@@ -90,8 +82,7 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
                     os.unlink(file_path)
         except Exception as e:
             print(f"Error deleting indexes: {e}")
-    
-    # Create indexes directory if it doesn't exist
+
     os.makedirs(INDEXES_DIR, exist_ok=True)
     
     with st.spinner('Building indexes. This may take a while...'):
@@ -119,7 +110,6 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
             raise RuntimeError(f"Index building failed: {e}")
 
 def display_product(product, similar_products=None, query=None):
-    # Product Card Style
     card = st.container()
     with card:
         col1, col2 = st.columns([1, 2.5])
@@ -139,7 +129,6 @@ def display_product(product, similar_products=None, query=None):
             with st.expander("Show product details"):
                 st.write(product['details'])
 
-            # Always use RAG generator for product descriptions
             with st.spinner("Generating enhanced description..."):
                 if similar_products is None:
                     similar_products = []
@@ -279,7 +268,7 @@ def main():
                     except Exception as e:
                         st.error(f"❌ Image search failed: {e}")
 
-    # --- FOOTER ---
+    # Footer
     st.markdown(
         "<hr class='app-footer-hr'>"
         "<div class='app-footer'>"
