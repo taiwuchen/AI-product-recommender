@@ -35,7 +35,7 @@ if os.path.exists(css_path):
 
 # Sidebar
 with st.sidebar:
-    st.markdown("**Introduction**")
+    st.header("Introduction")
     st.markdown("---")
     st.markdown(
         "Welcome! This app helps you find fashion products using **text** or **image** search powered by AI.\n\n"
