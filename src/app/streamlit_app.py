@@ -232,7 +232,7 @@ def main():
                 help="Paste a direct link to a product image."
             )
 
-        if st.button("Search by Image", help="Click to search for products similar to your image."):
+        if st.button("Search by Image"):
             image = None
 
             if uploaded_file is not None and image_url.strip():
