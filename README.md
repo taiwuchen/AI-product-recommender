@@ -50,11 +50,11 @@ pip install -r requirements.txt
 
 ### 3. Configure API Keys
 
-- **Google Vertex AI:** Required for text embeddings. Set up a Google Cloud project and download a service account key.
-Set the environment variable in your shell or `.env` file:
+- **Google Vertex AI:** Required for text embeddings. Set up a Google Cloud project and authenticate using the Google Cloud CLI:
   ```
-  export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/service-account.json"
+  gcloud auth application-default login
   ```
+This will open a browser window for you to log in with your Google account. The credentials will be stored locally and used automatically by the application.
 
 - **OpenRouter API Key:** For LLM product description generation. Set your API key in `src/app/streamlit_app.py` or via environment variable.
 
