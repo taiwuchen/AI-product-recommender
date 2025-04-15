@@ -9,7 +9,7 @@ class RAGGenerator:
         self.product_loader = product_loader
         self.api_key = api_key
 
-    def _extract_product_attributes(self, name: str, details: str) -> Tuple[List[str], List[str], List[str]]:
+    def extract_product_attributes(self, name: str, details: str) -> Tuple[List[str], List[str], List[str]]:
         categories = []
         materials = []
         features = []
@@ -82,8 +82,8 @@ class RAGGenerator:
         # Get product details
         similar_products = self.product_loader.get_product_details(indices[0].tolist())
         return similar_products
-    
-    def _build_similar_products_context(self, similar_products: List[Dict], target_product: Optional[Dict] = None) -> str:
+
+    def build_similar_products_context(self, similar_products: List[Dict], target_product: Optional[Dict] = None) -> str:
         if not similar_products:
             return ""
         
@@ -106,7 +106,7 @@ class RAGGenerator:
             
         return "\n\n".join(context_parts)
 
-    def _build_llm_prompt_format(self) -> str:
+    def build_llm_prompt_format(self) -> str:
         return (
             "Fill in the following format by writing only inside the brackets [] (but do not include the brackets in the output). Use bold font for key words. Follow the structure exactly.\n\n"
             "Format:\n"
@@ -125,7 +125,7 @@ class RAGGenerator:
             "- Machine-washable and shrink-resistant\n"
         )
 
-    def _call_llm_api(self, messages: List[Dict], model: str = "google/gemini-2.0-flash-lite-001") -> str:
+    def call_llm_api(self, messages: List[Dict], model: str = "google/gemini-2.0-flash-lite-001") -> str:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -163,10 +163,10 @@ class RAGGenerator:
         name = product.get("name", "")
         details = product.get("details", "")
 
-        categories, materials, features = self._extract_product_attributes(name, details)
-        
-        similar_context = self._build_similar_products_context(similar_products, product)
-        
+        categories, materials, features = self.extract_product_attributes(name, details)
+
+        similar_context = self.build_similar_products_context(similar_products, product)
+
         # Build product info
         product_info = f"Product Name: {name}\nProduct Details: {details}"
         extra_info = ""
@@ -189,12 +189,12 @@ class RAGGenerator:
             
         if similar_context:
             prompt += "Context from Similar Products:\n" + similar_context + "\n\n"
-            
-        prompt += self._build_llm_prompt_format()
-        
+
+        prompt += self.build_llm_prompt_format()
+
         messages = [{"role": "user", "content": prompt}]
-        return self._call_llm_api(messages=messages) # Use default text model
-    
+        return self.call_llm_api(messages=messages) # Use default text model
+
     def generate_image_description_with_rag(self,
                                            image,
                                            similar_products: List[Dict]) -> str:
@@ -208,10 +208,10 @@ class RAGGenerator:
         image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
         image_bytes = img_byte_arr.getvalue()
         encoded_image = base64.b64encode(image_bytes).decode('utf-8')
-        
+
         # Build context from similar products
-        similar_context = self._build_similar_products_context(similar_products)
-        
+        similar_context = self.build_similar_products_context(similar_products)
+
         # Build prompt
         prompt = (
             "You are an expert fashion analyzer. Describe this fashion item in detail.\n\n"
@@ -223,9 +223,9 @@ class RAGGenerator:
                 f"{similar_context}\n\n"
                 f"Use this context to enhance your description, but primarily focus on what you see in the image.\n\n"
             )
-            
-        prompt += self._build_llm_prompt_format()
-        
+
+        prompt += self.build_llm_prompt_format()
+
         # Prepare the message payload for multimodal input
         messages = [
             {
@@ -236,6 +236,6 @@ class RAGGenerator:
                 ]
             }
         ]
-        
+
         # Call the unified API function with the appropriate model
-        return self._call_llm_api(messages=messages, model="google/gemini-2.0-flash-001")
+        return self.call_llm_api(messages=messages, model="google/gemini-2.0-flash-001")
