@@ -1,0 +1,38 @@
+/* Main header */
+h1.app-title {
+    text-align: center;
+    color: #22223b;
+    font-size: 2.5rem;
+    margin-bottom: 0.2em;
+    margin-top: 0.5em;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+}
+
+/* Subtitle/description */
+div.app-desc {
+    text-align: center;
+    color: #4a4e69;
+    font-size: 1.2rem;
+    margin-bottom: 1.5em;
+}
+
+/* Custom horizontal rule for footer */
+hr.app-footer-hr {
+    margin-top: 2em;
+    margin-bottom: 1em;
+    border: none;
+    border-top: 1.5px solid #e0e0e0;
+}
+
+/* Footer text */
+div.app-footer {
+    text-align: center;
+    color: #888;
+    font-size: 1rem;
+    margin-bottom: 0.5em;
+}
+
+/* Product card tweaks */
+.stContainer > div > .stMarkdown {
+    margin-bottom: 0.5em;
+}

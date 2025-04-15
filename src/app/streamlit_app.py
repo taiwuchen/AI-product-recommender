@@ -28,6 +28,25 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- Inject custom CSS from style.css ---
+css_path = os.path.join(os.path.dirname(__file__), "style.css")
+if os.path.exists(css_path):
+    with open(css_path) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+# --- SIDEBAR ---
+with st.sidebar:
+    st.markdown("## 👕 AI Product Recommender")
+    st.markdown(
+        "Welcome! This app helps you find fashion products using **text** or **image** search powered by AI.\n\n"
+        "- Use the **Text Search** tab to describe what you want.\n"
+        "- Use the **Image Search** tab to upload or link to a product image.\n\n"
+        "Results are enhanced with AI-generated descriptions."
+    )
+    st.markdown("---")
+    st.markdown("Made with ❤️ using [Streamlit](https://streamlit.io/)")
+    st.markdown("[GitHub Repo](https://github.com/taiwuchen/AI-product-recommender)")
+
 # Global variables for models
 text_embedding_generator = None
 image_embedding_generator = None
@@ -94,46 +113,59 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
             
             # Save indexes
             vector_db.save_indices(INDEXES_DIR)
-            st.success('Indexes built and saved successfully!')
+            st.success('✅ Indexes built and saved successfully!')
         except Exception as e:
             st.error(f"Failed to build indexes: {e}")
             raise RuntimeError(f"Index building failed: {e}")
 
 def display_product(product, similar_products=None, query=None):
-    col1, col2 = st.columns([1, 3])
-    
-    with col1:
-        try:
-            image = image_embedding_generator.download_image(product['image_url'], convert_to_rgb=True, referer='https://www.zara.com/')
-            if image:
-                st.image(image, use_container_width=True)
-            else:
-                st.error("Failed to load image")
-        except Exception as e:
-            st.error(f"Error downloading image: {e}")
-    
-    with col2:
-        st.subheader(product['name'])
-        st.write(product['details'])
-        st.write(f"[View on ZARA]({product['link']})")
-        
-        # Always use RAG generator for product descriptions
-        with st.spinner("Generating enhanced description..."):
-            if similar_products is None:
-                # If no similar products are provided, use an empty list
-                similar_products = []
-                
-            description = rag_generator.generate_product_description_with_rag(
-                product=product,
-                similar_products=similar_products,
-                query=query
-            )
-            st.markdown(description)
+    # Product Card Style
+    card = st.container()
+    with card:
+        col1, col2 = st.columns([1, 2.5])
+        with col1:
+            try:
+                image = image_embedding_generator.download_image(product['image_url'], convert_to_rgb=True, referer='https://www.zara.com/')
+                if image:
+                    st.image(image, use_container_width="always", caption=product['name'])
+                else:
+                    st.error("Failed to load image")
+            except Exception as e:
+                st.error(f"Error downloading image: {e}")
+
+        with col2:
+            st.markdown(f"### {product['name']}")
+            st.markdown(f"[View on ZARA]({product['link']})", help="Open product page in a new tab")
+            with st.expander("Show product details"):
+                st.write(product['details'])
+
+            # Always use RAG generator for product descriptions
+            with st.spinner("Generating enhanced description..."):
+                if similar_products is None:
+                    similar_products = []
+                description = rag_generator.generate_product_description_with_rag(
+                    product=product,
+                    similar_products=similar_products,
+                    query=query
+                )
+                st.markdown("**AI-Enhanced Description:**")
+                st.markdown(description)
+    st.markdown("---")
 
 def main():
-    st.title("AI Product Recommendation System")
-    st.write("Search for fashion products using text or image!")
-    
+    st.markdown(
+        "<h1 class='app-title'>👕 AI Product Recommendation System</h1>",
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        "<div class='app-desc'>"
+        "Search for fashion products using <b>text</b> or <b>image</b>!<br>"
+        "Powered by AI and RAG."
+        "</div>",
+        unsafe_allow_html=True
+    )
+    st.markdown("")
+
     # Load data
     try:
         df, loader = load_data()
@@ -141,7 +173,7 @@ def main():
     except Exception as e:
         st.error(f"❌ Failed to load product data: {e}")
         st.stop()
-    
+
     # Initialize models
     try:
         global text_embedding_generator, image_embedding_generator, vector_db, rag_generator
@@ -151,7 +183,7 @@ def main():
     except Exception as e:
         st.error(f"❌ Failed to initialize embedding models: {e}")
         st.error("This application requires access to Google Vertex AI. Please check your credentials.")
-    
+
     # Build or load indexes
     try:
         build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db)
@@ -159,55 +191,71 @@ def main():
         st.error(f"❌ Failed to build indexes: {e}")
         st.error("Cannot continue without properly built indexes.")
         st.stop()
-    
-    # Create tabs for different search modes
-    tab1, tab2 = st.tabs(["Text Search", "Image Search"])
-    
+
+    # --- MAIN TABS ---
+    tab1, tab2 = st.tabs(
+        [
+            "🔤 Text Search",
+            "🖼️ Image Search"
+        ]
+    )
+
     with tab1:
-        st.header("Search by Text")
-        text_query = st.text_input("Enter your search query", "", key="text_search_query")
-        
-        if st.button("Search by Text"):
+        st.header("🔤 Search by Text")
+        st.markdown("Describe the product you want. For example: *'black bomber jacket with zipper pockets'*")
+        text_query = st.text_input(
+            "Enter your search query",
+            "",
+            key="text_search_query",
+            help="Describe the product you are looking for (e.g., color, style, features)."
+        )
+
+        if st.button("Search by Text", help="Click to search for products matching your description."):
             if text_query.strip():
                 with st.spinner("Searching and generating description..."):
                     try:
                         query_embedding = text_embedding_generator.generate_text_embedding(text_query)
                         distances, indices = vector_db.search_by_text(
                             query_embedding, k=5, query_text=text_query, keyword_boost=True)
-                        
                         st.subheader("Results")
                         products = loader.get_product_details(indices[0].tolist())
-                        
                         if not products:
                             st.warning("No products found matching your query.")
                         else:
                             for i, product in enumerate(products):
-                                st.divider()
                                 display_product(product, similar_products=products, query=text_query)
                     except Exception as e:
                         st.error(f"❌ Search failed: {e}")
-    
+
     with tab2:
-        st.header("Search by Image")
-        
-        st.info("Please provide a single image using ONE of the methods below:")
-        
+        st.header("🖼️ Search by Image")
+        st.markdown("Find similar products by uploading an image or providing an image URL.")
+
+        st.info("Please provide a single image using **one** of the methods below:")
+
         col1, col2 = st.columns(2)
-        
+
         with col1:
-            # Option 1: Upload an image
-            uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"], key="image_search_uploader")
-        
+            uploaded_file = st.file_uploader(
+                "Upload an image",
+                type=["jpg", "jpeg", "png"],
+                key="image_search_uploader",
+                help="Upload a product image from your device."
+            )
+
         with col2:
-            # Option 2: Enter image URL
-            image_url = st.text_input("Or enter an image URL", key="image_search_url")
-        
-        if st.button("Search by Image"):
+            image_url = st.text_input(
+                "Or enter an image URL",
+                key="image_search_url",
+                help="Paste a direct link to a product image."
+            )
+
+        if st.button("Search by Image", help="Click to search for products similar to your image."):
             image = None
 
             if uploaded_file is not None and image_url.strip():
                 st.warning("You've provided both an uploaded file and a URL. Only the uploaded file will be used.")
-                
+
             if uploaded_file is not None:
                 image = Image.open(uploaded_file)
             elif image_url.strip():
@@ -219,24 +267,31 @@ def main():
                     st.error(f"Error downloading image: {e}")
             else:
                 st.warning("Please provide an image by uploading a file or entering a URL.")
-            
+
             if image:
                 with st.spinner("Analyzing image and searching for similar products..."):
                     try:
                         query_embedding = image_embedding_generator.generate_embedding_from_pil_image(image)
                         distances, indices = vector_db.search_by_image(query_embedding, k=5)
-                        
                         st.subheader("Results")
                         products = loader.get_product_details(indices[0].tolist())
-                        
                         if not products:
                             st.warning("No products found matching your image.")
                         else:
                             for product in products:
-                                st.divider()
                                 display_product(product)
                     except Exception as e:
                         st.error(f"❌ Image search failed: {e}")
+
+    # --- FOOTER ---
+    st.markdown(
+        "<hr class='app-footer-hr'>"
+        "<div class='app-footer'>"
+        "AI Product Recommender &copy; 2025 &mdash; Built with Streamlit | "
+        "<a href='https://github.com/your-repo-link' target='_blank'>GitHub</a>"
+        "</div>",
+        unsafe_allow_html=True
+    )
 
 if __name__ == "__main__":
     main()
