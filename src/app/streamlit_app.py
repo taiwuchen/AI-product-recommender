@@ -4,7 +4,7 @@ import streamlit as st
 import requests
 import json
 from PIL import Image
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 # Add parent directory to path to import modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -13,11 +13,13 @@ from utils.data_loader import ProductDataLoader
 from models.text_embedding import TextEmbeddingGenerator
 from models.image_embedding import ImageEmbeddingGenerator
 from models.vector_db import VectorDatabase
+from models.rag_generator import RAGGenerator
 
 DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
                          'ZARA_jackets_men.csv')
 INDEXES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'indexes')
 GOOGLE_CREDENTIALS_PATH = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+API_KEY = os.environ.get('OPENROUTER_API_KEY')
 
 # Set up page configuration
 st.set_page_config(
@@ -30,6 +32,7 @@ st.set_page_config(
 text_embedding_generator = None
 image_embedding_generator = None
 vector_db = None
+rag_generator = None
 
 @st.cache_resource
 def load_data():
@@ -38,7 +41,7 @@ def load_data():
 
 @st.cache_resource
 def initialize_models():
-    global text_embedding_generator, image_embedding_generator, vector_db
+    global text_embedding_generator, image_embedding_generator, vector_db, rag_generator
     
     # Create separate text and image embedding generators
     text_embedding_generator = TextEmbeddingGenerator(
@@ -48,7 +51,14 @@ def initialize_models():
     image_embedding_generator = ImageEmbeddingGenerator()
     
     vector_db = VectorDatabase()
-    return text_embedding_generator, image_embedding_generator, vector_db
+    
+    # Load data for the RAG generator
+    _, loader = load_data()
+    
+    # Initialize the RAG generator with vector_db, loader, and API key
+    rag_generator = RAGGenerator(vector_db=vector_db, product_loader=loader, api_key=API_KEY)
+    
+    return text_embedding_generator, image_embedding_generator, vector_db, rag_generator
 
 def build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db):
     # Delete existing indexes to force rebuild
@@ -72,7 +82,7 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
             print(f"Generated text embeddings shape: {text_embeddings.shape}")
             
             # Generate image embeddings
-            image_embeddings = image_embedding_generator.generate_batch_image_embeddings(df['first_image_url'].tolist())
+            image_embeddings = image_embedding_generator.generate_batch_image_embeddings(df['image_url'].tolist())
             print(f"Generated image embeddings shape: {image_embeddings.shape}")
             
             # Add embeddings to vector db
@@ -89,116 +99,7 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
             st.error(f"Failed to build indexes: {e}")
             raise RuntimeError(f"Index building failed: {e}")
 
-def generate_product_description(product: Dict, query: Optional[str] = None):
-    """Generate a description for a single product"""
-    if not product:
-        return ""
-    
-    name = product.get("name", "")
-    details = product.get("details", "")
-    
-    # Extract categories, materials, and features
-    categories = []
-    materials = []
-    features = []
-    
-    if details and isinstance(details, str):
-        details_lower = details.lower()
-        product_name_lower = name.lower()
-        if "bomber" in details_lower or "bomber" in product_name_lower:
-            categories.append("bomber")
-        elif "leather" in details_lower or "leather" in product_name_lower:
-            categories.append("leather")
-        elif "denim" in details_lower or "denim" in product_name_lower:
-            categories.append("denim")
-        elif "technical" in details_lower or "technical" in product_name_lower:
-            categories.append("technical")
-        if "cotton" in details_lower:
-            materials.append("cotton")
-        elif "linen" in details_lower:
-            materials.append("linen")
-        elif "suede" in details_lower:
-            materials.append("suede")
-        elif "leather" in details_lower:
-            if "faux" in details_lower:
-                materials.append("faux leather")
-            else:
-                materials.append("leather")
-        if "zip" in details_lower:
-            features.append("zip closure")
-        if "pocket" in details_lower:
-            features.append("pockets")
-        if "hood" in details_lower:
-            features.append("hooded")
-    
-    # Build product info
-    product_info = f"Product Name: {name}\nProduct Details: {details}"
-    extra_info = ""
-    if categories:
-        extra_info += "Categories: " + ", ".join(categories) + "\n"
-    if materials:
-        extra_info += "Materials: " + ", ".join(materials) + "\n"
-    if features:
-        extra_info += "Features: " + ", ".join(features) + "\n"
-    
-    # Build prompt
-    prompt = ""
-    if query:
-        prompt += f"User Query: {query}\n\n"
-    prompt += "Product Information:\n" + product_info + "\n\n"
-    if extra_info:
-        prompt += "Additional Details:\n" + extra_info + "\n\n"
-    prompt += (
-    "Fill in the following format by writing only inside the brackets [] (but do not include the brackets in the output). Use bold font for key words. Follow the structure exactly.\n\n"
-    "Format:\n"
-    "Gemini Generated Description:\n\n"
-    "[Write a creative, engaging product description of around 30 words.]\n\n"
-    "Key Features:\n"
-    "- [Feature 1]\n"
-    "- [Feature 2]\n"
-    "- [Feature 3]\n"
-    
-    "Example:\n"
-    "Gemini Generated Description:\n\n"
-    "This ultra-soft hoodie blends comfort with street style—perfect for chilly evenings or laid-back weekends. Made from recycled fibers, it’s cozy, breathable, and eco-conscious.\n\n"
-    "Key Features:\n"
-    "- Made with 100% recycled materials\n"
-    "- Unisex design with relaxed fit\n"
-    "- Machine-washable and shrink-resistant\n"
-)
-    
-    API_KEY = os.environ.get('OPENROUTER_API_KEY')
-    
-    headers = {
-        "Authorization": "Bearer " + API_KEY,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://ai-product-recommender.app", 
-        "X-Title": "AI Product Recommender"
-    }
-    
-    payload = {
-        "model": "google/gemini-2.0-flash-lite-001",
-        "messages": [
-            {"role": "user", "content": prompt}
-        ]
-    }
-    
-    try:
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, data=json.dumps(payload))
-    except Exception as e:
-        return f"Error during API call: {str(e)}"
-    
-    if response.status_code == 200:
-        try:
-            response_json = response.json()
-            result_text = response_json.get("choices", [{}])[0].get("message", {}).get("content", "")
-            return result_text if result_text else "No description generated."
-        except Exception as e:
-            return "Error parsing API response."
-    else:
-        return f"Error: {response.status_code} - {response.text}"
-
-def display_product(product):
+def display_product(product, similar_products=None, query=None):
     col1, col2 = st.columns([1, 3])
     
     with col1:
@@ -215,7 +116,19 @@ def display_product(product):
         st.subheader(product['name'])
         st.write(product['details'])
         st.write(f"[View on ZARA]({product['link']})")
-        st.markdown(generate_product_description(product))
+        
+        # Always use RAG generator for product descriptions
+        with st.spinner("Generating enhanced description..."):
+            if similar_products is None:
+                # If no similar products are provided, use an empty list
+                similar_products = []
+                
+            description = rag_generator.generate_product_description_with_rag(
+                product=product,
+                similar_products=similar_products,
+                query=query
+            )
+            st.markdown(description)
 
 def main():
     st.title("AI Product Recommendation System")
@@ -231,8 +144,8 @@ def main():
     
     # Initialize models
     try:
-        global text_embedding_generator, image_embedding_generator, vector_db
-        text_embedding_generator, image_embedding_generator, vector_db = initialize_models()
+        global text_embedding_generator, image_embedding_generator, vector_db, rag_generator
+        text_embedding_generator, image_embedding_generator, vector_db, rag_generator = initialize_models()
         model_name = os.environ.get("VERTEX_EMBEDDING_MODEL", "text-embedding-005")
         st.success(f"✅ Embedding models initialized successfully (using {model_name})")
     except Exception as e:
@@ -268,9 +181,9 @@ def main():
                         if not products:
                             st.warning("No products found matching your query.")
                         else:
-                            for product in products:
+                            for i, product in enumerate(products):
                                 st.divider()
-                                display_product(product)
+                                display_product(product, similar_products=products, query=text_query)
                     except Exception as e:
                         st.error(f"❌ Search failed: {e}")
     

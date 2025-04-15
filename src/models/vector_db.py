@@ -9,15 +9,9 @@ class VectorDatabase:
     def __init__(self, dimension_text: int = 768, dimension_image: int = 512):
         self.dimension_text = dimension_text
         self.dimension_image = dimension_image
-        
-        # Initialize indices
         self.index_text = faiss.IndexFlatL2(dimension_text)
         self.index_image = faiss.IndexFlatL2(dimension_image)
-        
-        # Keep track of product ids
         self.product_ids = []
-        
-        # Store original data for keyword filtering
         self.product_texts = []
         
     def add_text_embeddings(self, embeddings: np.ndarray, ids: List[int]) -> None:
@@ -155,18 +149,15 @@ class VectorDatabase:
         if query_embedding.shape[0] != self.dimension_image:
             print(f"Warning: Query image embedding dimension mismatch. Expected {self.dimension_image}, got {query_embedding.shape[0]}.")
             return np.array([[0.0] * k]), np.array([[0] * k])
-            
-        # Ensure query is float32
+
         query_embedding = query_embedding.astype(np.float32).reshape(1, -1)
-        
-        # Search index
+
         distances, indices = self.index_image.search(query_embedding, k)
         
         # For L2 distance, lower is better, so we need to invert the scale
         max_dist = np.max(distances) if np.max(distances) > 0 else 1.0
         similarity_scores = 1.0 - (distances / max_dist)
         
-        # Print detailed information about each result
         print(f"\nImage search results:")
         for i, idx in enumerate(indices[0]):
             if idx < len(self.product_ids):
@@ -208,7 +199,6 @@ class VectorDatabase:
                 self.dimension_text = dimensions.get('text', self.dimension_text)
                 self.dimension_image = dimensions.get('image', self.dimension_image)
         except (FileNotFoundError, EOFError):
-            # Dimensions will be inferred from loaded indices
             pass
             
         # Load text index
