@@ -21,20 +21,19 @@ INDEXES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.pa
 GOOGLE_CREDENTIALS_PATH = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
 API_KEY = "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"
 
-# Set up page configuration
+# Page configuration
 st.set_page_config(
     page_title="AI Product Recommender",
     page_icon="👕",
     layout="wide"
 )
 
-# --- Inject custom CSS from style.css ---
 css_path = os.path.join(os.path.dirname(__file__), "style.css")
 if os.path.exists(css_path):
     with open(css_path) as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# --- SIDEBAR ---
+# Sidebar
 with st.sidebar:
     st.markdown("**Introduction**")
     st.markdown("---")
@@ -104,12 +103,13 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
             
             # Save indexes
             vector_db.save_indices(INDEXES_DIR)
-            st.success('✅ Indexes built and saved successfully!')
+            st.toast('✅ Indexes built and saved successfully!')
         except Exception as e:
             st.error(f"Failed to build indexes: {e}")
             raise RuntimeError(f"Index building failed: {e}")
 
 def display_product(product, similar_products=None, query=None):
+    st.markdown("---")
     card = st.container()
     with card:
         col1, col2 = st.columns([1, 2.5])
@@ -139,7 +139,6 @@ def display_product(product, similar_products=None, query=None):
                 )
                 st.markdown("**AI-Enhanced Description:**")
                 st.markdown(description)
-    st.markdown("---")
 
 def main():
     st.markdown(
@@ -157,7 +156,7 @@ def main():
     # Load data
     try:
         df, loader = load_data()
-        st.success("✅ Product data loaded successfully")
+        st.toast("✅ Product data loaded successfully")
     except Exception as e:
         st.error(f"❌ Failed to load product data: {e}")
         st.stop()
@@ -167,7 +166,7 @@ def main():
         global text_embedding_generator, image_embedding_generator, vector_db, rag_generator
         text_embedding_generator, image_embedding_generator, vector_db, rag_generator = initialize_models()
         model_name = os.environ.get("VERTEX_EMBEDDING_MODEL", "text-embedding-005")
-        st.success(f"✅ Embedding models initialized successfully (using {model_name})")
+        st.toast(f"✅ Embedding models initialized successfully (using {model_name})")
     except Exception as e:
         st.error(f"❌ Failed to initialize embedding models: {e}")
         st.error("This application requires access to Google Vertex AI. Please check your credentials.")
@@ -180,7 +179,7 @@ def main():
         st.error("Cannot continue without properly built indexes.")
         st.stop()
 
-    # --- MAIN TABS ---
+    # Main tabs
     tab1, tab2 = st.tabs(
         [
             "🔤 Text Search",
