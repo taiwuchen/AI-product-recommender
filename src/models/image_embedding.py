@@ -119,17 +119,13 @@ class ImageEmbeddingGenerator:
         return embedding
     
     def generate_image_embedding(self, image_url: str) -> np.ndarray:
-        # Return cached embedding if available
         if image_url in self.image_embedding_cache:
             return self.image_embedding_cache[image_url]
-            
-        # Download the image
         image = self.download_image(image_url, convert_to_rgb=True)
         
         if image is None:
             raise ValueError(f"Failed to download image from {image_url}")
             
-        # Generate embedding from the image
         embedding = self.generate_embedding_from_pil_image(image)
         
         # Cache the result
