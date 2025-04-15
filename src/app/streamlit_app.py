@@ -82,7 +82,7 @@ def build_or_load_indexes(df, text_embedding_generator, image_embedding_generato
             print(f"Generated text embeddings shape: {text_embeddings.shape}")
             
             # Generate image embeddings
-            image_embeddings = image_embedding_generator.generate_batch_image_embeddings(df['first_image_url'].tolist())
+            image_embeddings = image_embedding_generator.generate_batch_image_embeddings(df['image_url'].tolist())
             print(f"Generated image embeddings shape: {image_embeddings.shape}")
             
             # Add embeddings to vector db
