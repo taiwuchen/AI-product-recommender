@@ -1,121 +1,103 @@
-# AI Product Recommendation System
+# AI Product Recommender
 
-A product recommendation system that uses vector search and embeddings to recommend fashion products based on text descriptions or images.
+An AI-powered product recommendation system for fashion items, featuring both text and image search. The system leverages vector search, retrieval-augmented generation (RAG), and large language models to generate creative, context-aware product descriptions and recommendations.
 
 ## Features
 
-- **Text-based Search**: Find products using natural language descriptions
-- **Image-based Search**: Upload an image to find visually similar products
-- **Vector Search**: Fast similarity search using FAISS
-- **Multi-modal Embeddings**: Text and image embedding generation with Google Vertex AI
+- **Text & Image Search:** Find similar products using either a text query or an image.
+- **Retrieval-Augmented Generation (RAG):** Generates rich, creative product descriptions by combining LLMs with context from similar products.
+- **Vector Database:** Fast similarity search using FAISS for both text and image embeddings.
+- **Modern UI:** Streamlit-based web interface for interactive exploration.
+- **Extensible:** Modular codebase for easy adaptation to other product domains.
 
 ## Project Structure
 
 ```
-AI-product-recommender/
-├── ZARA_jackets_men.csv      # Sample product dataset
-├── requirements.txt          # Python dependencies
-├── indexes/                  # Directory for FAISS indexes
-└── src/
-    ├── app/
-    │   └── streamlit_app.py  # Streamlit web application
-    ├── models/
-    │   ├── embeddings.py         # Text and image embedding generation
-    │   ├── base_embedding.py     # Base embedding generator class
-    │   ├── text_embedding.py     # Text-specific embedding generation
-    │   ├── image_embedding.py    # Image-specific embedding generation
-    │   ├── clip_image_embedding.py # CLIP-based image embeddings
-    │   └── vector_db.py          # Vector database using FAISS
-    ├── demo_clip_embeddings.py   # Demo for CLIP embeddings
-    └── utils/
-        └── data_loader.py    # Data loading and preprocessing
+.
+├── src/
+│   ├── app/
+│   │   └── streamlit_app.py      # Main Streamlit web app
+│   ├── models/
+│   │   ├── rag_generator.py      # RAG logic and LLM prompt construction
+│   │   ├── vector_db.py          # Vector database using FAISS
+│   │   ├── text_embedding.py     # Text embedding with Google Vertex AI
+│   │   └── image_embedding.py    # Image embedding with CLIP
+│   └── utils/
+│       └── data_loader.py        # Product data loading and preprocessing
+├── ZARA_jackets_men.csv          # Example product dataset
+├── requirements.txt              # Python dependencies
+├── vector_search_rag_demo.ipynb  # Notebook demo of vector search & RAG
 ```
 
-## Setup and Installation
+## Setup
 
-1. Clone the repository:
+### 1. Clone the repository
+
 ```bash
-git clone https://github.com/yourusername/AI-product-recommender.git
+git clone <your-repo-url>
 cd AI-product-recommender
 ```
 
-2. Install the required dependencies:
+### 2. Install dependencies
+
+It's recommended to use a virtual environment:
+
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-3. (Optional) Set up Google Cloud credentials for Vertex AI:
+### 3. Configure API Keys
+
+- **Google Vertex AI:** Required for text embeddings. Set up a Google Cloud project and authenticate using the Google Cloud CLI:
+  ```
+  gcloud auth application-default login
+  ```
+This will open a browser window for you to log in with your Google account. The credentials will be stored locally and used automatically by the application.
+
+- **OpenRouter API Key:** For LLM product description generation. Set your API key in `src/app/streamlit_app.py` or via environment variable.
+
+### 4. Prepare Data
+
+Ensure `ZARA_jackets_men.csv` is present in the project root. You can adapt the loader for your own product data.
+
+## Running the App
+
 ```bash
-export GOOGLE_APPLICATION_CREDENTIALS="path/to/your/credentials.json"
-export GOOGLE_CLOUD_PROJECT="authentic-arch-456221-j3"
-export VERTEX_EMBEDDING_MODEL="text-embedding-large-exp-03-07"
+streamlit run src/app/streamlit_app.py
 ```
 
-## Running the Application
+The app will:
+- Load and preprocess product data
+- Build or load vector indexes for text and image search
+- Provide a web UI for searching and viewing recommendations
 
-Start the Streamlit web application:
-```bash
-cd src/app
-streamlit run streamlit_app.py
-```
+## Example Usage
 
-## How It Works
+- **Text Search:** Enter a product description or keywords to find similar items.
+- **Image Search:** Upload an image to find visually similar products.
+- The app generates a creative product description and key features using RAG and LLMs.
 
-1. **Data Loading**: The system loads product data from a CSV file containing product titles, descriptions, and image URLs.
+## Notebooks
 
-2. **Embedding Generation**:
-   - Text embeddings are generated from product descriptions using Google Vertex AI
-   - Image embeddings are generated from product images using TensorFlow's MobileNetV2 or Google Vertex AI
-   - CLIP embeddings provide multi-modal capabilities, aligning images and text in the same embedding space
+- `vector_search_rag_demo.ipynb`: Demonstrates vector search and RAG concepts in a simplified setting.
 
-3. **Vector Database**: Embeddings are stored in FAISS, a library for efficient similarity search
+## Customization
 
-4. **Similarity Search**:
-   - Text search matches products with similar descriptions
-   - Image search matches products with similar visual characteristics
+- Swap in your own product data by updating the CSV and loader.
+- Adjust the LLM prompt or RAG logic in `rag_generator.py` for different product domains.
 
-## Technologies Used
+## Dependencies
 
-- **FAISS**: For vector similarity search
-- **TensorFlow**: For image embedding generation (fallback)
-- **Google Vertex AI**: For text embedding generation
-- **CLIP**: For multi-modal (text and image) embeddings in the same vector space
-- **Streamlit**: For the web interface
-- **Pillow**: For image processing
-- **NumPy/Pandas**: For data manipulation
+- Streamlit
+- FAISS
+- Google Cloud Vertex AI
+- Transformers (for CLIP)
+- Pillow, Pandas, Numpy, Scikit-learn, etc.
 
-## Using CLIP Embeddings
-
-The project includes support for OpenAI's CLIP (Contrastive Language-Image Pre-training) model, which provides powerful multi-modal embeddings. CLIP aligns images and text in the same vector space, enabling:
-
-1. **Text-to-Image Search**: Find images that match a text description
-2. **Image-to-Text Matching**: Match images to the most relevant text description
-3. **Cross-modal Recommendations**: Use both text and image inputs for more robust recommendations
-
-To use CLIP embeddings:
-
-```python
-from models.clip_image_embedding import CLIPImageEmbeddingGenerator
-
-# Initialize the CLIP embedding generator
-clip_generator = CLIPImageEmbeddingGenerator(model_name="openai/clip-vit-base-patch32")
-
-# Generate image embedding from URL
-image_embedding = clip_generator.generate_image_embedding("https://example.com/image.jpg")
-
-# Generate text embedding
-text_embedding = clip_generator.generate_text_embedding("a blue denim jacket")
-
-# Compare similarity between image and text
-similarity = clip_generator.compute_similarity(image_embedding, text_embedding)
-print(f"Similarity score: {similarity}")
-```
-
-Run the demo script to see CLIP in action:
-```bash
-python src/demo_clip_embeddings.py --image_url="https://example.com/image.jpg" --text_query="a photo of a jacket"
-```
+See `requirements.txt` for the full list.
 
 ## License
 
-[MIT License](LICENSE)
+MIT License

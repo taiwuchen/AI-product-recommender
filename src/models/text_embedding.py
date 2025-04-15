@@ -79,7 +79,6 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
             if text in self.text_embedding_cache:
                 return self.text_embedding_cache[text]
             
-            # Single text case
             try:
                 embeddings = self.text_embedding_model.get_embeddings([text])
                 if embeddings and len(embeddings) > 0 and embeddings[0].values:
