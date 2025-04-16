@@ -88,7 +88,7 @@ class ImageEmbeddingGenerator:
     
     def generate_embedding_from_pil_image(self, image: Image.Image) -> np.ndarray:
         width, height = image.size
-        small_image = image.resize((32, 32))  # Resize for consistent hashing
+        small_image = image.resize((32, 32))
         pixels = list(small_image.getdata())
         image_hash = hash(str(pixels))
         cache_key = f"pil_image_{image_hash}"
@@ -100,20 +100,13 @@ class ImageEmbeddingGenerator:
         if self.clip_model is None or self.clip_processor is None:
             raise ValueError("CLIP model or processor not initialized")
                 
-        # Preprocess the image
         inputs = self.preprocess_image(image)
         
         # Generate embedding
         with torch.no_grad():
             image_features = self.clip_model.get_image_features(**inputs)
-                
-        # Normalize the embedding
         image_embeddings = image_features / image_features.norm(dim=1, keepdim=True)
-        
-        # Convert to numpy array
         embedding = image_embeddings.cpu().numpy()[0]
-        
-        # Cache the result
         self.image_embedding_cache[cache_key] = embedding
         
         return embedding
@@ -140,7 +133,6 @@ class ImageEmbeddingGenerator:
         embeddings = []
         valid_indices = []
         
-        # First pass: process all valid URLs and keep track of their indices
         for i, url in enumerate(image_urls):
             if url and isinstance(url, str) and url.strip():
                 try:
@@ -150,7 +142,6 @@ class ImageEmbeddingGenerator:
                 except Exception as e:
                     print(f"Skipping URL {url} due to error: {e}")
         
-        # If we couldn't process any URLs, return empty array
         if not embeddings:
             return np.array([])
             
