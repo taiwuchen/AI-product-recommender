@@ -9,9 +9,8 @@ from google.oauth2 import service_account
 
 PROJECT_ID = "authentic-arch-456221-j3"
 REGION = "us-central1"
-MODEL_ID = "text-embedding-005" # Use the recommended text-embedding-005 model (gecko is being discontinued)
+MODEL_ID = "text-embedding-005"
 
-# Base class moved from base_embedding.py
 class BaseEmbeddingGenerator:
     
     def __init__(self, google_credentials_path: Optional[str] = None, vertex_ai_region: Optional[str] = None):
@@ -53,7 +52,6 @@ class TextEmbeddingGenerator(BaseEmbeddingGenerator):
                 model_id = MODEL_ID
                 
                 print(f"Initializing Vertex AI Text-Embeddings API with project: {project_id} and model: {model_id}")
-                # Initialize the Vertex AI Embedding model directly using the provided structure
                 self.text_embedding_model = TextEmbeddingModel.from_pretrained(model_id)
                 print(f"✅ Vertex AI Text-Embeddings API initialized successfully with model: {model_id}")
                 self.using_vertex_ai = True
