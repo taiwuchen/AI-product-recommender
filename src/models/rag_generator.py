@@ -72,11 +72,10 @@ class RAGGenerator:
                                  k: int = 5,
                                  query_text: Optional[str] = None) -> List[Dict]:
 
-        # Use the appropriate search method based on type
         if search_type == 'text':
             distances, indices = self.vector_db.search_by_text(
                 query_embedding, k=k, query_text=query_text, keyword_boost=True)
-        else:  # image search
+        else:
             distances, indices = self.vector_db.search_by_image(query_embedding, k=k)
             
         # Get product details
