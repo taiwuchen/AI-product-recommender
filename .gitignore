@@ -1,5 +1,5 @@
 indexes/
 .venv/
 __pycache__/
-vector_search_rag_demo.ipynb
 ZARA_jackets_men.csv
+.env

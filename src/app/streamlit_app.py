@@ -19,7 +19,7 @@ DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path
                          'ZARA_jackets_men.csv')
 INDEXES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'indexes')
 GOOGLE_CREDENTIALS_PATH = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-API_KEY = os.environ.get('OPENROUTER_API_KEY')
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
 
 # Page configuration
 st.set_page_config(
@@ -67,7 +67,7 @@ def initialize_models():
     image_embedding_generator = ImageEmbeddingGenerator()
     vector_db = VectorDatabase()
     _, loader = load_data()
-    rag_generator = RAGGenerator(vector_db=vector_db, product_loader=loader, api_key=API_KEY)
+    rag_generator = RAGGenerator(vector_db=vector_db, product_loader=loader, api_key=OPENROUTER_API_KEY)
     
     return text_embedding_generator, image_embedding_generator, vector_db, rag_generator
 
