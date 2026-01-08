@@ -1,4 +1,4 @@
-# AI Product Recommender
+# Product Recommender
 
 An AI-powered product recommendation system for fashion items, featuring both text and image search. The system leverages vector search, retrieval-augmented generation (RAG), and large language models to generate creative, context-aware product descriptions and recommendations.
 
@@ -24,6 +24,7 @@ An AI-powered product recommendation system for fashion items, featuring both te
 │   │   └── image_embedding.py    # Image embedding with CLIP
 │   └── utils/
 │       └── data_loader.py        # Product data loading and preprocessing
+├── ZARA_jackets_men.csv          # Sample product dataset
 ├── requirements.txt              # Python dependencies
 ├── .env.example                  # Example environment variables
 ```
@@ -68,7 +69,7 @@ For Google Vertex AI text embeddings, you can either:
 
 ### 4. Prepare Data
 
-Place your product CSV file (with columns: `product_name`, `link`, `product_images`, `details`) in the project root and update the `DATA_PATH` in `streamlit_app.py`.
+A sample dataset (`ZARA_jackets_men.csv`) is included. To use your own data, provide a CSV with columns: `product_name`, `link`, `product_images`, `details` and update `DATA_PATH` in `streamlit_app.py`.
 
 ## Running the App
 
