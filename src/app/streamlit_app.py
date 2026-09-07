@@ -18,7 +18,6 @@ from src.utils.images import load_image
 
 DATA_PATH = ROOT / "ZARA_jackets_men.csv"
 INDEXES_DIR = ROOT / "indexes"
-EXAMPLES = ["A cropped denim jacket", "A coat with a removable inner layer", "Lightweight jacket with a hood"]
 MODES = ["Semantic", "Semantic + keywords", "Keyword"]
 
 st.set_page_config(page_title="Semantic Product Search", layout="wide")
@@ -64,24 +63,21 @@ def catalog_image(url):
         return None
 
 
-def select_example(query):
-    st.session_state.query = query
-
-
 def show_product(product, rank=None, query=""):
     image = catalog_image(product["image_url"])
     if image is not None:
         st.image(ImageOps.pad(image, (600, 760), color="#ECEBE5"), width="stretch")
     else:
         st.markdown('<div class="image-missing">Image unavailable</div>', unsafe_allow_html=True)
-    if rank:
-        st.caption(f"MATCH {rank:02d}")
-    st.markdown(f"#### {product['name'].capitalize()}")
-    label, excerpts = product_evidence(product, query)
-    st.caption(label)
-    for excerpt in excerpts:
-        st.text(excerpt)
-    with st.expander("Product details"):
+    name = product["name"].capitalize()
+    st.markdown(f"#### {f'{rank}. ' if rank else ''}{name}")
+    with st.expander("View details"):
+        if query:
+            label, excerpts = product_evidence(product, query)
+            st.caption(label)
+            for excerpt in excerpts:
+                st.text(excerpt)
+            st.divider()
         st.text(product["details"] or "No description is available.")
         st.link_button("Original listing", product["link"])
 
@@ -96,20 +92,19 @@ def show_results(products, query=""):
 def main():
     fingerprint = catalog_fingerprint(DATA_PATH)
     df, loader, keyword = catalog(fingerprint)
-    st.caption("TAIWU CHEN / PRODUCT SEARCH STUDY")
     st.title("Semantic Product Search")
-    st.write("Find a jacket by describing it or sharing a reference photo.")
-    st.caption(f"{len(df)} archival ZARA menswear listings · Text and image search · Experimental catalog")
-    st.divider()
+    st.caption(f"Find a jacket by description or photo · {len(df)} pieces")
     text_tab, image_tab = st.tabs(["Describe it", "Use a photo"])
     with text_tab:
-        st.caption("TRY A SEARCH")
-        for column, example in zip(st.columns(3), EXAMPLES):
-            column.button(example, on_click=select_example, args=(example,), width="stretch")
         with st.form("text_search", border=False):
-            query = st.text_input("What are you looking for?", key="query", placeholder="e.g. a cropped denim jacket")
-            mode = st.radio("Search method", MODES, horizontal=True)
-            submitted = st.form_submit_button("Find products", type="primary")
+            field, options, action = st.columns([6, 2, 1.5], vertical_alignment="bottom")
+            with field:
+                query = st.text_input("Describe a jacket", key="query", placeholder="e.g. a cropped denim jacket")
+            with options:
+                with st.popover("Search options", width="stretch"):
+                    mode = st.radio("Search method", MODES)
+            with action:
+                submitted = st.form_submit_button("Search", type="primary", width="stretch")
         if submitted:
             st.session_state.pop("text_results", None)
             if not query.strip():
@@ -135,13 +130,11 @@ def main():
         results = st.session_state.get("text_results")
         if results:
             st.subheader(f"Results for “{results['query']}”")
-            st.caption(f"{results['mode']} · {results['ms']:.0f} ms search time, excluding first-use setup and image loading")
-            st.caption("Excerpts show listing evidence, not a guarantee that every request is met.")
+            st.caption(f"{len(results['ids'])} pieces · {results['mode']}")
             if not results["ids"]:
                 st.info("No matching words found. Try a different description or search method.")
             show_results(loader.get_product_details(results["ids"]), results["query"])
     with image_tab:
-        st.write("Upload a clear photo of one garment to find visually similar pieces.")
         with st.form("image_search", border=False):
             uploaded = st.file_uploader("Reference photo", type=["jpg", "jpeg", "png"], max_upload_size=15)
             submitted_image = st.form_submit_button("Find similar pieces", type="primary")
@@ -167,16 +160,10 @@ def main():
         if results:
             st.image(results["reference"], width=160, caption="Your reference")
             st.subheader("Visually similar pieces")
-            st.caption(f"{results['ms']:.0f} ms · {results['report']['indexed']} of {len(df)} catalog images searchable")
-            st.caption("Visual similarity can reflect shape, color, or background. Materials are not verified from the photo.")
+            st.caption(f"{results['report']['indexed']} of {len(df)} catalog photos searchable")
             show_results(loader.get_product_details(results["ids"]))
-    if not st.session_state.get("text_results") and not st.session_state.get("image_results"):
-        st.subheader("Explore the catalog")
-        for column, product in zip(st.columns(3), loader.get_product_details([21, 16, 27])):
-            with column:
-                show_product(product)
     st.divider()
-    st.caption("Independent portfolio project by Taiwu Chen. Archival product data; availability and prices are not tracked. Not affiliated with ZARA.")
+    st.caption("Taiwu Chen · Archival ZARA catalog · Availability not tracked · Not affiliated with ZARA")
 
 
 if __name__ == "__main__":

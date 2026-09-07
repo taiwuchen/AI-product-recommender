@@ -1,10 +1,10 @@
-[data-testid="stMainBlockContainer"] { max-width: 1240px; padding-top: 3.5rem !important; padding-bottom: 2rem; }
-h1 { font-family: Georgia, serif !important; font-size: clamp(2.3rem, 4vw, 4rem) !important; font-weight: 400 !important; letter-spacing: -0.045em; }
+[data-testid="stMainBlockContainer"] { max-width: 1080px; padding-top: 3.5rem !important; padding-bottom: 2rem; }
+h1 { font-family: Georgia, serif !important; font-size: clamp(1.8rem, 3vw, 2.6rem) !important; font-weight: 400 !important; letter-spacing: -0.045em; }
 h3, h4 { font-weight: 500 !important; letter-spacing: -0.025em; }
 [data-testid="stCaptionContainer"] { color: #5c6259; }
 [data-testid="stImage"] img { border-radius: 2px; }
 [data-testid="stText"] { font-family: inherit; font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; }
-[data-testid="stBaseButton-primary"] { min-width: 170px; }
+[data-testid="stBaseButton-primary"] { min-width: 120px; }
 button { transition: background-color 160ms ease, transform 160ms ease !important; }
 button:hover { transform: translateY(-1px); }
 [data-testid="stImage"] { animation: enter 240ms ease-out; }

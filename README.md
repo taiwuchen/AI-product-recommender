@@ -9,21 +9,23 @@ The project explores a concrete question: can shoppers find an item without know
 - Describe a garment: **“a coat with a removable inner layer.”**
 - Search with a paraphrase: **“a short jean jacket.”**
 - Upload a reference photo to retrieve visually similar products.
-- Switch between **Semantic**, **Semantic + keywords**, and **Keyword** to compare rankings.
-- Inspect exact listing excerpts alongside each result. These are source evidence, not generated product claims.
+- Open **Search options** to compare Semantic, Semantic + keywords, and Keyword retrieval.
+- Expand **View details** to inspect exact listing excerpts for each result. These are source evidence, not generated product claims.
 
 This is catalog search, not a personalized recommendation system. It has no user profiles, purchase history, or inventory integration.
 
 ## Run locally
 
-Use Python 3.12. No deployment is required.
+Use `uv` and Python 3.12. No deployment is required. On macOS, install uv with `brew install uv` if needed.
 
 ```bash
-python3.12 -m venv .venv
+uv venv --python 3.12 .venv
+uv pip sync requirements.lock
 source .venv/bin/activate
-pip install -r requirements.lock
 streamlit run src/app/streamlit_app.py
 ```
+
+For an existing `.venv`, skip the creation step. Use `uv pip sync requirements.lock` to install dependencies; `pip` is not bundled with uv-created environments.
 
 The catalog and keyword method work without cloud credentials. Image search downloads the CLIP model on first use and runs inference locally. Product images are downloaded from their catalog URLs and cached locally.
 
@@ -98,7 +100,15 @@ python -m evaluation.run --modes keyword --output evaluation/keyword-results
 
 The runner writes JSON with every ranked result and Markdown with P@5, Recall@5, nDCG@5, MRR@5, median latency, p95 latency, and the lowest-ranked cases. It checks the catalog hash so labels cannot silently outlive their dataset. Search timing includes query embedding and retrieval, excluding initial setup, downloads, and rendering. Semantic methods share one query embedding per query for a fair comparison.
 
-See the [measured keyword baseline](evaluation/keyword-results.md). A full semantic comparison requires a working OpenRouter API key; do not infer semantic improvement from the keyword-only report.
+The [live comparison](evaluation/results.md) measured all three methods on the same 24 queries:
+
+| Method | nDCG@5 | Recall@5 | Median search time |
+|---|---:|---:|---:|
+| Keyword | 0.773 | 0.847 | 0.8 ms |
+| Semantic | 0.900 | 0.964 | 432 ms |
+| Semantic + keywords | 0.892 | 0.978 | 432 ms |
+
+Semantic search is the default. It ranked results best on this provisional set; keyword boosting slightly increased recall but reduced ranking quality. Timings come from one local run, including the embedding API call for semantic methods.
 
 Precision at five is capped below 1 when the catalog has fewer than five relevant products. Recall and nDCG make those cases easier to interpret. This small diagnostic set does not establish generalization, personalized recommendation quality, image-search relevance, or production latency.
 
@@ -108,7 +118,7 @@ Precision at five is capped below 1 when the catalog has fewer than five relevan
 python -m unittest discover -s tests -v
 ```
 
-See the [verification record](evaluation/validation.md) for completed checks and the remaining authentication gap. For a live CLIP check across successive worker threads, run `python -m evaluation.image_smoke`.
+See the [verification record](evaluation/validation.md) for earlier checks; the live comparison above completes the previously pending OpenRouter evaluation. For a live CLIP check across successive worker threads, run `python -m evaluation.image_smoke`.
 
 Regression checks cover failed image downloads and ID alignment after saving/reloading, index reuse, invalid vectors, small and empty catalogs, source-grounded excerpts, and evaluation metrics.
 
