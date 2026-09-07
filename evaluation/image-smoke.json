@@ -1,0 +1,56 @@
+{
+  "kind": "image",
+  "model": "openai/clip-vit-base-patch32",
+  "catalog_sha256": "31c3b97c03035f161d3385ad1b46d2893ac7d6acfcc492aee0d1ed90bc6f22e2",
+  "indexed": 55,
+  "total": 66,
+  "failed_image_ids": [
+    1,
+    6,
+    8,
+    17,
+    19,
+    22,
+    23,
+    29,
+    34,
+    35,
+    61
+  ],
+  "generated_at": "2026-09-07T21:38:35.502840+00:00",
+  "reference_product_id": 27,
+  "worker_thread_runs": [
+    {
+      "retrieved_product_ids": [
+        27,
+        5,
+        50,
+        48,
+        45
+      ],
+      "search_ms": 869.7352079907432
+    },
+    {
+      "retrieved_product_ids": [
+        27,
+        5,
+        50,
+        48,
+        45
+      ],
+      "search_ms": 26.758541993331164
+    },
+    {
+      "retrieved_product_ids": [
+        27,
+        5,
+        50,
+        48,
+        45
+      ],
+      "search_ms": 26.70408398262225
+    }
+  ],
+  "passed": true,
+  "scope": "Exact catalog-image retrieval across successive worker threads; not an independent image relevance benchmark."
+}

@@ -1,279 +1,183 @@
-import os
 import sys
+import time
+from pathlib import Path
+
 import streamlit as st
-import requests
-import json
-from PIL import Image
-from typing import Dict, Optional, List
+from dotenv import load_dotenv
+from PIL import Image, ImageOps
 
-# Add parent directory to path to import modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+load_dotenv(ROOT / ".env")
 
-from utils.data_loader import ProductDataLoader
-from models.text_embedding import TextEmbeddingGenerator
-from models.image_embedding import ImageEmbeddingGenerator
-from models.vector_db import VectorDatabase
-from models.rag_generator import RAGGenerator
+from src.search.explanations import product_evidence
+from src.search.indexes import catalog_fingerprint, load_or_build
+from src.search.keyword import KeywordSearch
+from src.utils.data_loader import ProductDataLoader
+from src.utils.images import load_image
 
-DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
-                         'ZARA_jackets_men.csv')
-INDEXES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'indexes')
-GOOGLE_CREDENTIALS_PATH = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
+DATA_PATH = ROOT / "ZARA_jackets_men.csv"
+INDEXES_DIR = ROOT / "indexes"
+EXAMPLES = ["A cropped denim jacket", "A coat with a removable inner layer", "Lightweight jacket with a hood"]
+MODES = ["Semantic", "Semantic + keywords", "Keyword"]
 
-# Page configuration
-st.set_page_config(
-    page_title="AI Product Recommender",
-    page_icon="👕",
-    layout="wide"
-)
+st.set_page_config(page_title="Semantic Product Search", layout="wide")
+st.html(ROOT / "src/app/style.css")
 
-css_path = os.path.join(os.path.dirname(__file__), "style.css")
-if os.path.exists(css_path):
-    with open(css_path) as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
-# Sidebar
-with st.sidebar:
-    st.header("Introduction")
-    st.markdown("---")
-    st.markdown(
-        "Welcome! This app helps you find fashion products using **text** or **image** search powered by AI.\n\n"
-        "- Use the **Text Search** tab to describe what you want.\n"
-        "- Use the **Image Search** tab to upload or link to a product image.\n\n"
-        "Results are enhanced with AI-generated descriptions."
-    )
-    st.markdown("---")
-    st.markdown("More Coming Soon...")
-
-# Global variables for models
-text_embedding_generator = None
-image_embedding_generator = None
-vector_db = None
-rag_generator = None
 
 @st.cache_resource
-def load_data():
+def catalog(fingerprint):
     loader = ProductDataLoader(DATA_PATH)
-    return loader.preprocess_data(), loader
+    df = loader.preprocess_data()
+    return df, loader, KeywordSearch(df["text_for_embedding"].tolist())
+
 
 @st.cache_resource
-def initialize_models():
-    global text_embedding_generator, image_embedding_generator, vector_db, rag_generator
-    
-    text_embedding_generator = TextEmbeddingGenerator(
-        google_credentials_path=GOOGLE_CREDENTIALS_PATH
-    )
-    image_embedding_generator = ImageEmbeddingGenerator()
-    vector_db = VectorDatabase()
-    _, loader = load_data()
-    rag_generator = RAGGenerator(vector_db=vector_db, product_loader=loader, api_key=OPENROUTER_API_KEY)
-    
-    return text_embedding_generator, image_embedding_generator, vector_db, rag_generator
+def text_model():
+    from src.models.text_embedding import TextEmbeddingGenerator
+    return TextEmbeddingGenerator()
 
-def build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db):
-    if os.path.exists(INDEXES_DIR):
-        try:
-            # Delete all files in directory without removing directory
-            for file_name in os.listdir(INDEXES_DIR):
-                file_path = os.path.join(INDEXES_DIR, file_name)
-                if os.path.isfile(file_path):
-                    os.unlink(file_path)
-        except Exception as e:
-            print(f"Error deleting indexes: {e}")
 
-    os.makedirs(INDEXES_DIR, exist_ok=True)
-    
-    with st.spinner('Building indexes. This may take a while...'):
-        try:
-            # Generate text embeddings - using the updated function with list input
-            text_embeddings = text_embedding_generator.generate_text_embedding(df['text_for_embedding'].tolist())
-            print(f"Generated text embeddings shape: {text_embeddings.shape}")
-            
-            # Generate image embeddings
-            image_embeddings = image_embedding_generator.generate_batch_image_embeddings(df['image_url'].tolist())
-            print(f"Generated image embeddings shape: {image_embeddings.shape}")
-            
-            # Add embeddings to vector db
-            vector_db.add_text_embeddings(text_embeddings, list(range(len(df))))
-            vector_db.add_image_embeddings(image_embeddings, list(range(len(df))))
-            
-            # Store original text data for keyword filtering
-            vector_db.set_product_texts(df['text_for_embedding'].tolist())
-            
-            # Save indexes
-            vector_db.save_indices(INDEXES_DIR)
-            st.toast('✅ Indexes built and saved successfully!')
-        except Exception as e:
-            st.error(f"Failed to build indexes: {e}")
-            raise RuntimeError(f"Index building failed: {e}")
+@st.cache_resource
+def image_model():
+    from src.models.image_embedding import ImageEmbeddingGenerator
+    return ImageEmbeddingGenerator()
 
-def display_product(product, similar_products=None, query=None):
-    st.markdown("---")
-    card = st.container()
-    with card:
-        col1, col2 = st.columns([1, 2.5])
-        with col1:
-            try:
-                image = image_embedding_generator.download_image(product['image_url'], convert_to_rgb=True, referer='https://www.zara.com/')
-                if image:
-                    st.image(image, use_container_width="always", caption=product['name'])
-                else:
-                    st.error("Failed to load image")
-            except Exception as e:
-                st.error(f"Error downloading image: {e}")
 
-        with col2:
-            st.markdown(f"### {product['name']}")
-            st.markdown(f"[View on ZARA]({product['link']})", help="Open product page in a new tab")
-            with st.expander("Show product details"):
-                st.write(product['details'])
+@st.cache_resource
+def search_index(kind, fingerprint):
+    if kind == "text":
+        from src.models.text_embedding import MODEL_ID
+        factory = text_model
+    else:
+        from src.models.image_embedding import MODEL_ID
+        factory = image_model
+    df, _, _ = catalog(fingerprint)
+    return load_or_build(DATA_PATH, df, INDEXES_DIR, kind, MODEL_ID, factory)
 
-            with st.spinner("Generating enhanced description..."):
-                if similar_products is None:
-                    similar_products = []
-                description = rag_generator.generate_product_description_with_rag(
-                    product=product,
-                    similar_products=similar_products,
-                    query=query
-                )
-                st.markdown("**AI-Enhanced Description:**")
-                st.markdown(description)
+
+@st.cache_data(max_entries=100)
+def catalog_image(url):
+    try:
+        return load_image(url, INDEXES_DIR / "images")
+    except Exception:
+        return None
+
+
+def select_example(query):
+    st.session_state.query = query
+
+
+def show_product(product, rank=None, query=""):
+    image = catalog_image(product["image_url"])
+    if image is not None:
+        st.image(ImageOps.pad(image, (600, 760), color="#ECEBE5"), width="stretch")
+    else:
+        st.markdown('<div class="image-missing">Image unavailable</div>', unsafe_allow_html=True)
+    if rank:
+        st.caption(f"MATCH {rank:02d}")
+    st.markdown(f"#### {product['name'].capitalize()}")
+    label, excerpts = product_evidence(product, query)
+    st.caption(label)
+    for excerpt in excerpts:
+        st.text(excerpt)
+    with st.expander("Product details"):
+        st.text(product["details"] or "No description is available.")
+        st.link_button("Original listing", product["link"])
+
+
+def show_results(products, query=""):
+    for start in range(0, len(products), 3):
+        for offset, (column, product) in enumerate(zip(st.columns(3), products[start:start + 3])):
+            with column:
+                show_product(product, start + offset + 1, query)
+
 
 def main():
-    st.markdown(
-        "<h1 class='app-title'>👕 AI Product Recommender</h1>",
-        unsafe_allow_html=True
-    )
-    st.markdown(
-        "<div class='app-desc'>"
-        "Search for fashion products using <b>text</b> or <b>image</b>!<br>"
-        "</div>",
-        unsafe_allow_html=True
-    )
-    st.markdown("")
-
-    # Load data
-    try:
-        df, loader = load_data()
-        st.toast("✅ Product data loaded successfully")
-    except Exception as e:
-        st.error(f"❌ Failed to load product data: {e}")
-        st.stop()
-
-    # Initialize models
-    try:
-        global text_embedding_generator, image_embedding_generator, vector_db, rag_generator
-        text_embedding_generator, image_embedding_generator, vector_db, rag_generator = initialize_models()
-        model_name = os.environ.get("VERTEX_EMBEDDING_MODEL", "text-embedding-005")
-        st.toast(f"✅ Embedding models initialized successfully (using {model_name})")
-    except Exception as e:
-        st.error(f"❌ Failed to initialize embedding models: {e}")
-        st.error("This application requires access to Google Vertex AI. Please check your credentials.")
-
-    # Build or load indexes
-    try:
-        build_or_load_indexes(df, text_embedding_generator, image_embedding_generator, vector_db)
-    except Exception as e:
-        st.error(f"❌ Failed to build indexes: {e}")
-        st.error("Cannot continue without properly built indexes.")
-        st.stop()
-
-    # Main tabs
-    tab1, tab2 = st.tabs(
-        [
-            "🔤 Text Search",
-            "🖼️ Image Search"
-        ]
-    )
-
-    with tab1:
-        st.header("Search by Text")
-        text_query = st.text_input(
-            "Enter your search query",
-            key="text_search_query",
-        )
-
-        if st.button("Search by Text"):
-            if text_query.strip():
-                with st.spinner("Searching and generating description..."):
-                    try:
-                        query_embedding = text_embedding_generator.generate_text_embedding(text_query)
-                        distances, indices = vector_db.search_by_text(
-                            query_embedding, k=5, query_text=text_query, keyword_boost=True)
-                        st.subheader("Results")
-                        products = loader.get_product_details(indices[0].tolist())
-                        if not products:
-                            st.warning("No products found matching your query.")
-                        else:
-                            for i, product in enumerate(products):
-                                display_product(product, similar_products=products, query=text_query)
-                    except Exception as e:
-                        st.error(f"❌ Search failed: {e}")
-
-    with tab2:
-        st.header("Search by Image")
-
-        st.info("Please provide a single image using **one** of the methods below:")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            uploaded_file = st.file_uploader(
-                "Upload an image",
-                type=["jpg", "jpeg", "png"],
-                key="image_search_uploader",
-            )
-
-        with col2:
-            image_url = st.text_input(
-                "Or enter an image URL",
-                key="image_search_url",
-                help="Paste a direct link to a product image."
-            )
-
-        if st.button("Search by Image"):
-            image = None
-
-            if uploaded_file is not None and image_url.strip():
-                st.warning("You've provided both an uploaded file and a URL. Only the uploaded file will be used.")
-
-            if uploaded_file is not None:
-                image = Image.open(uploaded_file)
-            elif image_url.strip():
-                try:
-                    image = image_embedding_generator.download_image(image_url, convert_to_rgb=True, referer='https://www.zara.com/')
-                    if image is None:
-                        st.error("Failed to load image from URL")
-                except Exception as e:
-                    st.error(f"Error downloading image: {e}")
+    fingerprint = catalog_fingerprint(DATA_PATH)
+    df, loader, keyword = catalog(fingerprint)
+    st.caption("TAIWU CHEN / PRODUCT SEARCH STUDY")
+    st.title("Semantic Product Search")
+    st.write("Find a jacket by describing it or sharing a reference photo.")
+    st.caption(f"{len(df)} archival ZARA menswear listings · Text and image search · Experimental catalog")
+    st.divider()
+    text_tab, image_tab = st.tabs(["Describe it", "Use a photo"])
+    with text_tab:
+        st.caption("TRY A SEARCH")
+        for column, example in zip(st.columns(3), EXAMPLES):
+            column.button(example, on_click=select_example, args=(example,), width="stretch")
+        with st.form("text_search", border=False):
+            query = st.text_input("What are you looking for?", key="query", placeholder="e.g. a cropped denim jacket")
+            mode = st.radio("Search method", MODES, horizontal=True)
+            submitted = st.form_submit_button("Find products", type="primary")
+        if submitted:
+            st.session_state.pop("text_results", None)
+            if not query.strip():
+                st.warning("Describe a product to start searching.")
             else:
-                st.warning("Please provide an image by uploading a file or entering a URL.")
+                try:
+                    if mode == "Keyword":
+                        start = time.perf_counter()
+                        ids = keyword.search(query)
+                    else:
+                        with st.spinner("Preparing semantic search on first use…"):
+                            db, _ = search_index("text", fingerprint)
+                            model = text_model()
+                        start = time.perf_counter()
+                        with st.spinner("Finding matches…"):
+                            embedding = model.generate_text_embedding(query)
+                            _, indices = db.search_by_text(embedding, query_text=query, keyword_boost=mode == "Semantic + keywords")
+                            ids = indices[0].tolist()
+                    st.session_state.text_results = {"ids": ids, "query": query, "mode": mode,
+                                                     "ms": (time.perf_counter() - start) * 1000}
+                except Exception as exc:
+                    st.error(f"Text search could not finish. {exc}")
+        results = st.session_state.get("text_results")
+        if results:
+            st.subheader(f"Results for “{results['query']}”")
+            st.caption(f"{results['mode']} · {results['ms']:.0f} ms search time, excluding first-use setup and image loading")
+            st.caption("Excerpts show listing evidence, not a guarantee that every request is met.")
+            if not results["ids"]:
+                st.info("No matching words found. Try a different description or search method.")
+            show_results(loader.get_product_details(results["ids"]), results["query"])
+    with image_tab:
+        st.write("Upload a clear photo of one garment to find visually similar pieces.")
+        with st.form("image_search", border=False):
+            uploaded = st.file_uploader("Reference photo", type=["jpg", "jpeg", "png"], max_upload_size=15)
+            submitted_image = st.form_submit_button("Find similar pieces", type="primary")
+        if submitted_image:
+            st.session_state.pop("image_results", None)
+            if uploaded is None:
+                st.warning("Choose a reference photo first.")
+            else:
+                try:
+                    with Image.open(uploaded) as source:
+                        reference = ImageOps.exif_transpose(source).convert("RGB")
+                    with st.spinner("Preparing image search on first use…"):
+                        db, report = search_index("image", fingerprint)
+                        model = image_model()
+                    start = time.perf_counter()
+                    embedding = model.generate_embedding_from_pil_image(reference)
+                    _, ids = db.search_by_image(embedding)
+                    st.session_state.image_results = {"ids": ids[0].tolist(), "reference": reference,
+                                                      "ms": (time.perf_counter() - start) * 1000, "report": report}
+                except Exception as exc:
+                    st.error(f"Image search could not finish. {exc}")
+        results = st.session_state.get("image_results")
+        if results:
+            st.image(results["reference"], width=160, caption="Your reference")
+            st.subheader("Visually similar pieces")
+            st.caption(f"{results['ms']:.0f} ms · {results['report']['indexed']} of {len(df)} catalog images searchable")
+            st.caption("Visual similarity can reflect shape, color, or background. Materials are not verified from the photo.")
+            show_results(loader.get_product_details(results["ids"]))
+    if not st.session_state.get("text_results") and not st.session_state.get("image_results"):
+        st.subheader("Explore the catalog")
+        for column, product in zip(st.columns(3), loader.get_product_details([21, 16, 27])):
+            with column:
+                show_product(product)
+    st.divider()
+    st.caption("Independent portfolio project by Taiwu Chen. Archival product data; availability and prices are not tracked. Not affiliated with ZARA.")
 
-            if image:
-                with st.spinner("Analyzing image and searching for similar products..."):
-                    try:
-                        query_embedding = image_embedding_generator.generate_embedding_from_pil_image(image)
-                        distances, indices = vector_db.search_by_image(query_embedding, k=5)
-                        st.subheader("Results")
-                        products = loader.get_product_details(indices[0].tolist())
-                        if not products:
-                            st.warning("No products found matching your image.")
-                        else:
-                            for product in products:
-                                display_product(product)
-                    except Exception as e:
-                        st.error(f"❌ Image search failed: {e}")
-
-    # Footer
-    st.markdown(
-        "<hr class='app-footer-hr'>"
-        "<div class='app-footer'>"
-        "AI Product Recommender &copy; 2025 &mdash; Built with Streamlit by Taiwu Chen | "
-        "<a href='https://github.com/taiwuchen/AI-product-recommender' target='_blank'>GitHub</a>"
-        "</div>",
-        unsafe_allow_html=True
-    )
 
 if __name__ == "__main__":
     main()

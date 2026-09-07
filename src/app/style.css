@@ -1,38 +1,14 @@
-/* Main header */
-h1.app-title {
-    text-align: center;
-    color: #22223b;
-    font-size: 2.5rem;
-    margin-bottom: 0.2em;
-    margin-top: 0.5em;
-    font-family: 'Segoe UI', 'Arial', sans-serif;
-}
-
-/* Subtitle/description */
-div.app-desc {
-    text-align: center;
-    color: #4a4e69;
-    font-size: 1.2rem;
-    margin-bottom: 1.5em;
-}
-
-/* Custom horizontal rule for footer */
-hr.app-footer-hr {
-    margin-top: 2em;
-    margin-bottom: 1em;
-    border: none;
-    border-top: 1.5px solid #e0e0e0;
-}
-
-/* Footer text */
-div.app-footer {
-    text-align: center;
-    color: #888;
-    font-size: 1rem;
-    margin-bottom: 0.5em;
-}
-
-/* Product card tweaks */
-.stContainer > div > .stMarkdown {
-    margin-bottom: 0.5em;
-}
+[data-testid="stMainBlockContainer"] { max-width: 1240px; padding-top: 3.5rem !important; padding-bottom: 2rem; }
+h1 { font-family: Georgia, serif !important; font-size: clamp(2.3rem, 4vw, 4rem) !important; font-weight: 400 !important; letter-spacing: -0.045em; }
+h3, h4 { font-weight: 500 !important; letter-spacing: -0.025em; }
+[data-testid="stCaptionContainer"] { color: #5c6259; }
+[data-testid="stImage"] img { border-radius: 2px; }
+[data-testid="stText"] { font-family: inherit; font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; }
+[data-testid="stBaseButton-primary"] { min-width: 170px; }
+button { transition: background-color 160ms ease, transform 160ms ease !important; }
+button:hover { transform: translateY(-1px); }
+[data-testid="stImage"] { animation: enter 240ms ease-out; }
+.image-missing { aspect-ratio: 600 / 760; background: #ecebe5; display: grid; place-items: center; color: #5c6259; }
+@keyframes enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 640px) { [data-testid="stMainBlockContainer"] { padding: 3.5rem 1rem 1.5rem !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; transform: none !important; } }

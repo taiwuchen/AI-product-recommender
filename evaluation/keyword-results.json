@@ -1,0 +1,916 @@
+{
+  "generated_at": "2026-09-07T21:27:34.071007+00:00",
+  "catalog_sha256": "31c3b97c03035f161d3385ad1b46d2893ac7d6acfcc492aee0d1ed90bc6f22e2",
+  "queries_sha256": "f23ac9915369ba0be3f1bc961d1252dd3f35dbf04d254bd6a306572a9cb5c7ec",
+  "judgments": "Provisional labels authored by the coding assistant from catalog titles and descriptions before running retrieval. Not independently human-reviewed; this is a small diagnostic set, not proof of general search quality.",
+  "python": "3.12.11",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "products": 66,
+  "queries": 24,
+  "setup_ms": 0.0011659867595881224,
+  "text_model": null,
+  "summary": {
+    "keyword": {
+      "precision_at_5": 0.2833333333333333,
+      "recall_at_5": 0.8472222222222222,
+      "ndcg_at_5": 0.7725347291693945,
+      "reciprocal_rank_at_5": 0.7583333333333333,
+      "median_search_ms": 0.28354147798381746,
+      "p95_search_ms": 0.29650001670233905
+    }
+  },
+  "per_query": [
+    {
+      "query": "a jacket made of linen",
+      "category": "material",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.4234170191921294,
+      "search_ms": 0.4234170191921294,
+      "results": [
+        {
+          "id": 46,
+          "name": "100% LINEN JACKET",
+          "relevant": true
+        },
+        {
+          "id": 47,
+          "name": "100% LINEN WAISTCOAT",
+          "relevant": false
+        },
+        {
+          "id": 64,
+          "name": "LINEN - COTTON OVERSHIRT",
+          "relevant": false
+        },
+        {
+          "id": 28,
+          "name": "FAUX SUEDE JACKET",
+          "relevant": false
+        },
+        {
+          "id": 3,
+          "name": "FAUX LEATHER JACKET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a jacket made of lyocell",
+      "category": "material",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.2905000001192093,
+      "search_ms": 0.2905000001192093,
+      "results": [
+        {
+          "id": 59,
+          "name": "LYOCELL JACKET",
+          "relevant": true
+        },
+        {
+          "id": 28,
+          "name": "FAUX SUEDE JACKET",
+          "relevant": false
+        },
+        {
+          "id": 3,
+          "name": "FAUX LEATHER JACKET",
+          "relevant": false
+        },
+        {
+          "id": 50,
+          "name": "LIGHT PADDED JACKET",
+          "relevant": false
+        },
+        {
+          "id": 44,
+          "name": "BASIC BOMBER JACKET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a wool coat",
+      "category": "material",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.2546670148149133,
+      "search_ms": 0.2546670148149133,
+      "results": [
+        {
+          "id": 17,
+          "name": "100% WOOL COAT - LIMITED EDITION",
+          "relevant": true
+        },
+        {
+          "id": 18,
+          "name": "TECHNICAL TRENCH COAT",
+          "relevant": false
+        },
+        {
+          "id": 16,
+          "name": "WATER-REPELLENT TRENCH COAT WITH DETACHABLE GILET",
+          "relevant": false
+        },
+        {
+          "id": 19,
+          "name": "OVERSIZE TRENCH COAT - LIMITED EDITION",
+          "relevant": false
+        },
+        {
+          "id": 20,
+          "name": "DOUBLE-BREASTED TECHNICAL TRENCH COAT",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a faux leather bomber",
+      "category": "material",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.24824999854899943,
+      "search_ms": 0.24824999854899943,
+      "results": [
+        {
+          "id": 2,
+          "name": "FAUX LEATHER BOMBER JACKET",
+          "relevant": true
+        },
+        {
+          "id": 1,
+          "name": "FAUX LEATHER JACKET",
+          "relevant": false
+        },
+        {
+          "id": 3,
+          "name": "FAUX LEATHER JACKET",
+          "relevant": false
+        },
+        {
+          "id": 27,
+          "name": "FAUX SUEDE BOMBER JACKET",
+          "relevant": false
+        },
+        {
+          "id": 0,
+          "name": "FADED LEATHER EFFECT JACKET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a faux suede jacket",
+      "category": "material",
+      "mode": "keyword",
+      "precision_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.2441669930703938,
+      "search_ms": 0.2441669930703938,
+      "results": [
+        {
+          "id": 27,
+          "name": "FAUX SUEDE BOMBER JACKET",
+          "relevant": true
+        },
+        {
+          "id": 11,
+          "name": "FAUX SUEDE EMBROIDERED JACKET",
+          "relevant": true
+        },
+        {
+          "id": 28,
+          "name": "FAUX SUEDE JACKET",
+          "relevant": true
+        },
+        {
+          "id": 49,
+          "name": "FAUX SUEDE BOXY FIT JACKET",
+          "relevant": true
+        },
+        {
+          "id": 5,
+          "name": "BOMBER JACKET WITH PATCH",
+          "relevant": true
+        }
+      ]
+    },
+    {
+      "query": "a cropped denim jacket",
+      "category": "shape",
+      "mode": "keyword",
+      "precision_at_5": 0.4,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 0.9197207891481876,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.2632919931784272,
+      "search_ms": 0.2632919931784272,
+      "results": [
+        {
+          "id": 22,
+          "name": "CROPPED DENIM JACKET",
+          "relevant": true
+        },
+        {
+          "id": 60,
+          "name": "CROPPED BOMBER JACKET",
+          "relevant": false
+        },
+        {
+          "id": 23,
+          "name": "DENIM JACKET WITH IRREGULAR TRIMS",
+          "relevant": true
+        },
+        {
+          "id": 21,
+          "name": "GEOMETRIC JACQUARD DENIM JACKET",
+          "relevant": false
+        },
+        {
+          "id": 36,
+          "name": "FLORAL JACQUARD JACKET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a sleeveless linen top",
+      "category": "shape",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 0.6309297535714575,
+      "reciprocal_rank_at_5": 0.5,
+      "retrieval_ms": 0.29650001670233905,
+      "search_ms": 0.29650001670233905,
+      "results": [
+        {
+          "id": 46,
+          "name": "100% LINEN JACKET",
+          "relevant": false
+        },
+        {
+          "id": 47,
+          "name": "100% LINEN WAISTCOAT",
+          "relevant": true
+        },
+        {
+          "id": 64,
+          "name": "LINEN - COTTON OVERSHIRT",
+          "relevant": false
+        },
+        {
+          "id": 24,
+          "name": "DENIM UTILITY GILET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "an oversized trench coat",
+      "category": "shape",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 0.6309297535714575,
+      "reciprocal_rank_at_5": 0.5,
+      "retrieval_ms": 0.29358299798332155,
+      "search_ms": 0.29358299798332155,
+      "results": [
+        {
+          "id": 18,
+          "name": "TECHNICAL TRENCH COAT",
+          "relevant": false
+        },
+        {
+          "id": 19,
+          "name": "OVERSIZE TRENCH COAT - LIMITED EDITION",
+          "relevant": true
+        },
+        {
+          "id": 20,
+          "name": "DOUBLE-BREASTED TECHNICAL TRENCH COAT",
+          "relevant": false
+        },
+        {
+          "id": 16,
+          "name": "WATER-REPELLENT TRENCH COAT WITH DETACHABLE GILET",
+          "relevant": false
+        },
+        {
+          "id": 17,
+          "name": "100% WOOL COAT - LIMITED EDITION",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a boxy jacket",
+      "category": "shape",
+      "mode": "keyword",
+      "precision_at_5": 0.8,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.29275001725181937,
+      "search_ms": 0.29275001725181937,
+      "results": [
+        {
+          "id": 49,
+          "name": "FAUX SUEDE BOXY FIT JACKET",
+          "relevant": true
+        },
+        {
+          "id": 57,
+          "name": "BOXY FIT JACKET WITH TOPSTITCHING",
+          "relevant": true
+        },
+        {
+          "id": 31,
+          "name": "JACKET WITH CONTRAST TOPSTITCHING",
+          "relevant": true
+        },
+        {
+          "id": 58,
+          "name": "BOXY FIT TECHNICAL JACKET",
+          "relevant": true
+        },
+        {
+          "id": 24,
+          "name": "DENIM UTILITY GILET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a belted trench coat",
+      "category": "detail",
+      "mode": "keyword",
+      "precision_at_5": 0.4,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 0.6934264036172708,
+      "reciprocal_rank_at_5": 0.5,
+      "retrieval_ms": 0.28983299853280187,
+      "search_ms": 0.28983299853280187,
+      "results": [
+        {
+          "id": 18,
+          "name": "TECHNICAL TRENCH COAT",
+          "relevant": false
+        },
+        {
+          "id": 19,
+          "name": "OVERSIZE TRENCH COAT - LIMITED EDITION",
+          "relevant": true
+        },
+        {
+          "id": 20,
+          "name": "DOUBLE-BREASTED TECHNICAL TRENCH COAT",
+          "relevant": true
+        },
+        {
+          "id": 16,
+          "name": "WATER-REPELLENT TRENCH COAT WITH DETACHABLE GILET",
+          "relevant": false
+        },
+        {
+          "id": 17,
+          "name": "100% WOOL COAT - LIMITED EDITION",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a jacket with reflective fabric",
+      "category": "detail",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.2929579932242632,
+      "search_ms": 0.2929579932242632,
+      "results": [
+        {
+          "id": 61,
+          "name": "REFLECTIVE EFFECT JACKET",
+          "relevant": true
+        },
+        {
+          "id": 65,
+          "name": "HOODED TECHNICAL JACKET",
+          "relevant": false
+        },
+        {
+          "id": 56,
+          "name": "LIGHT PADDED JACKET",
+          "relevant": false
+        },
+        {
+          "id": 37,
+          "name": "JACKET WITH MAO COLLAR",
+          "relevant": false
+        },
+        {
+          "id": 26,
+          "name": "LIGHTWEIGHT BOMBER JACKET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a denim jacket with contrast stitching",
+      "category": "detail",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.293166987830773,
+      "search_ms": 0.293166987830773,
+      "results": [
+        {
+          "id": 32,
+          "name": "DENIM JACKET WITH CONTRAST TOPSTITCHING",
+          "relevant": true
+        },
+        {
+          "id": 21,
+          "name": "GEOMETRIC JACQUARD DENIM JACKET",
+          "relevant": false
+        },
+        {
+          "id": 33,
+          "name": "JACKET WITH CONTRAST TOPSTITCHING",
+          "relevant": false
+        },
+        {
+          "id": 13,
+          "name": "CONTRAST PRINT JACKET",
+          "relevant": false
+        },
+        {
+          "id": 22,
+          "name": "CROPPED DENIM JACKET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a jacket with a corduroy collar",
+      "category": "detail",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.286665977910161,
+      "search_ms": 0.286665977910161,
+      "results": [
+        {
+          "id": 54,
+          "name": "RUBBERISED JACKET - LIMITED EDITION",
+          "relevant": true
+        },
+        {
+          "id": 28,
+          "name": "FAUX SUEDE JACKET",
+          "relevant": false
+        },
+        {
+          "id": 44,
+          "name": "BASIC BOMBER JACKET",
+          "relevant": false
+        },
+        {
+          "id": 37,
+          "name": "JACKET WITH MAO COLLAR",
+          "relevant": false
+        },
+        {
+          "id": 12,
+          "name": "TECHNICAL JACKET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a coat with a removable inner layer",
+      "category": "detail",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.2829169970937073,
+      "search_ms": 0.2829169970937073,
+      "results": [
+        {
+          "id": 16,
+          "name": "WATER-REPELLENT TRENCH COAT WITH DETACHABLE GILET",
+          "relevant": true
+        },
+        {
+          "id": 19,
+          "name": "OVERSIZE TRENCH COAT - LIMITED EDITION",
+          "relevant": false
+        },
+        {
+          "id": 18,
+          "name": "TECHNICAL TRENCH COAT",
+          "relevant": false
+        },
+        {
+          "id": 17,
+          "name": "100% WOOL COAT - LIMITED EDITION",
+          "relevant": false
+        },
+        {
+          "id": 20,
+          "name": "DOUBLE-BREASTED TECHNICAL TRENCH COAT",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a quilted jacket with a drawstring hem",
+      "category": "detail",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.28370798099786043,
+      "search_ms": 0.28370798099786043,
+      "results": [
+        {
+          "id": 35,
+          "name": "DIAMOND JACQUARD JACKET",
+          "relevant": true
+        },
+        {
+          "id": 55,
+          "name": "TECHNICAL JACKET - LIMITED EDITION",
+          "relevant": false
+        },
+        {
+          "id": 38,
+          "name": "UTILITY JACKET WITH POCKETS",
+          "relevant": false
+        },
+        {
+          "id": 51,
+          "name": "LIGHTWEIGHT QUILTED GILET",
+          "relevant": false
+        },
+        {
+          "id": 15,
+          "name": "PUFFER TECHNICAL JACKET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a coat that repels water",
+      "category": "paraphrase",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.2773749874904752,
+      "search_ms": 0.2773749874904752,
+      "results": [
+        {
+          "id": 16,
+          "name": "WATER-REPELLENT TRENCH COAT WITH DETACHABLE GILET",
+          "relevant": true
+        },
+        {
+          "id": 18,
+          "name": "TECHNICAL TRENCH COAT",
+          "relevant": false
+        },
+        {
+          "id": 17,
+          "name": "100% WOOL COAT - LIMITED EDITION",
+          "relevant": false
+        },
+        {
+          "id": 19,
+          "name": "OVERSIZE TRENCH COAT - LIMITED EDITION",
+          "relevant": false
+        },
+        {
+          "id": 20,
+          "name": "DOUBLE-BREASTED TECHNICAL TRENCH COAT",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a jacket that shines back when light hits it",
+      "category": "paraphrase",
+      "mode": "keyword",
+      "precision_at_5": 0.0,
+      "recall_at_5": 0.0,
+      "ndcg_at_5": 0.0,
+      "reciprocal_rank_at_5": 0,
+      "retrieval_ms": 0.2833749749697745,
+      "search_ms": 0.2833749749697745,
+      "results": [
+        {
+          "id": 50,
+          "name": "LIGHT PADDED JACKET",
+          "relevant": false
+        },
+        {
+          "id": 56,
+          "name": "LIGHT PADDED JACKET",
+          "relevant": false
+        },
+        {
+          "id": 28,
+          "name": "FAUX SUEDE JACKET",
+          "relevant": false
+        },
+        {
+          "id": 3,
+          "name": "FAUX LEATHER JACKET",
+          "relevant": false
+        },
+        {
+          "id": 44,
+          "name": "BASIC BOMBER JACKET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a denim layer without sleeves",
+      "category": "paraphrase",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 0.38685280723454163,
+      "reciprocal_rank_at_5": 0.2,
+      "retrieval_ms": 0.28120799106545746,
+      "search_ms": 0.28120799106545746,
+      "results": [
+        {
+          "id": 21,
+          "name": "GEOMETRIC JACQUARD DENIM JACKET",
+          "relevant": false
+        },
+        {
+          "id": 22,
+          "name": "CROPPED DENIM JACKET",
+          "relevant": false
+        },
+        {
+          "id": 32,
+          "name": "DENIM JACKET WITH CONTRAST TOPSTITCHING",
+          "relevant": false
+        },
+        {
+          "id": 23,
+          "name": "DENIM JACKET WITH IRREGULAR TRIMS",
+          "relevant": false
+        },
+        {
+          "id": 24,
+          "name": "DENIM UTILITY GILET",
+          "relevant": true
+        }
+      ]
+    },
+    {
+      "query": "a short jean jacket",
+      "category": "paraphrase",
+      "mode": "keyword",
+      "precision_at_5": 0.0,
+      "recall_at_5": 0.0,
+      "ndcg_at_5": 0.0,
+      "reciprocal_rank_at_5": 0,
+      "retrieval_ms": 0.28525001835078,
+      "search_ms": 0.28525001835078,
+      "results": [
+        {
+          "id": 28,
+          "name": "FAUX SUEDE JACKET",
+          "relevant": false
+        },
+        {
+          "id": 3,
+          "name": "FAUX LEATHER JACKET",
+          "relevant": false
+        },
+        {
+          "id": 50,
+          "name": "LIGHT PADDED JACKET",
+          "relevant": false
+        },
+        {
+          "id": 44,
+          "name": "BASIC BOMBER JACKET",
+          "relevant": false
+        },
+        {
+          "id": 34,
+          "name": "FLORAL JACQUARD JACKET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a jacket with fabric that resists tearing",
+      "category": "paraphrase",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.2863749978132546,
+      "search_ms": 0.2863749978132546,
+      "results": [
+        {
+          "id": 41,
+          "name": "TEXTURED WEAVE TECHNICAL JACKET",
+          "relevant": true
+        },
+        {
+          "id": 65,
+          "name": "HOODED TECHNICAL JACKET",
+          "relevant": false
+        },
+        {
+          "id": 56,
+          "name": "LIGHT PADDED JACKET",
+          "relevant": false
+        },
+        {
+          "id": 37,
+          "name": "JACKET WITH MAO COLLAR",
+          "relevant": false
+        },
+        {
+          "id": 26,
+          "name": "LIGHTWEIGHT BOMBER JACKET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a coat with two rows of buttons",
+      "category": "paraphrase",
+      "mode": "keyword",
+      "precision_at_5": 0.0,
+      "recall_at_5": 0.0,
+      "ndcg_at_5": 0.0,
+      "reciprocal_rank_at_5": 0,
+      "retrieval_ms": 0.28041700716130435,
+      "search_ms": 0.28041700716130435,
+      "results": [
+        {
+          "id": 18,
+          "name": "TECHNICAL TRENCH COAT",
+          "relevant": false
+        },
+        {
+          "id": 48,
+          "name": "COTTON JACKET",
+          "relevant": false
+        },
+        {
+          "id": 17,
+          "name": "100% WOOL COAT - LIMITED EDITION",
+          "relevant": false
+        },
+        {
+          "id": 16,
+          "name": "WATER-REPELLENT TRENCH COAT WITH DETACHABLE GILET",
+          "relevant": false
+        },
+        {
+          "id": 5,
+          "name": "BOMBER JACKET WITH PATCH",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a lightweight jacket with a hood",
+      "category": "detail",
+      "mode": "keyword",
+      "precision_at_5": 0.2,
+      "recall_at_5": 0.3333333333333333,
+      "ndcg_at_5": 0.2960819109658652,
+      "reciprocal_rank_at_5": 0.5,
+      "retrieval_ms": 0.28295800439082086,
+      "search_ms": 0.28295800439082086,
+      "results": [
+        {
+          "id": 26,
+          "name": "LIGHTWEIGHT BOMBER JACKET",
+          "relevant": false
+        },
+        {
+          "id": 63,
+          "name": "TECHNICAL WINDBREAKER JACKET",
+          "relevant": true
+        },
+        {
+          "id": 42,
+          "name": "TECHNICAL JACKET",
+          "relevant": false
+        },
+        {
+          "id": 6,
+          "name": "HOODED BOMBER JACKET",
+          "relevant": false
+        },
+        {
+          "id": 65,
+          "name": "HOODED TECHNICAL JACKET",
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query": "a varsity jacket with patches",
+      "category": "detail",
+      "mode": "keyword",
+      "precision_at_5": 0.8,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 0.9828920819566879,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.2827499993145466,
+      "search_ms": 0.2827499993145466,
+      "results": [
+        {
+          "id": 7,
+          "name": "BOMBER JACKET WITH PATCH",
+          "relevant": true
+        },
+        {
+          "id": 6,
+          "name": "HOODED BOMBER JACKET",
+          "relevant": true
+        },
+        {
+          "id": 5,
+          "name": "BOMBER JACKET WITH PATCH",
+          "relevant": true
+        },
+        {
+          "id": 4,
+          "name": "SATIN JACKET WITH EMBROIDERED SLOGAN",
+          "relevant": false
+        },
+        {
+          "id": 11,
+          "name": "FAUX SUEDE EMBROIDERED JACKET",
+          "relevant": true
+        }
+      ]
+    },
+    {
+      "query": "a rubberised outer layer",
+      "category": "material",
+      "mode": "keyword",
+      "precision_at_5": 0.4,
+      "recall_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "reciprocal_rank_at_5": 1.0,
+      "retrieval_ms": 0.2790830039884895,
+      "search_ms": 0.2790830039884895,
+      "results": [
+        {
+          "id": 45,
+          "name": "GILET WITH RUBBERISED FINISH",
+          "relevant": true
+        },
+        {
+          "id": 54,
+          "name": "RUBBERISED JACKET - LIMITED EDITION",
+          "relevant": true
+        }
+      ]
+    }
+  ]
+}

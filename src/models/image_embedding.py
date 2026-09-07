@@ -1,149 +1,42 @@
+import logging
+
+import requests
 import numpy as np
 import torch
-import urllib.parse
-import requests
-from PIL import Image
-from io import BytesIO
-from typing import List, Optional, Dict
-from transformers import CLIPProcessor, CLIPModel
+from PIL import ImageOps
+from transformers import CLIPModel, CLIPProcessor
+
+from src.utils.images import load_image
+
+MODEL_ID = "openai/clip-vit-base-patch32"
+
 
 class ImageEmbeddingGenerator:
-    
-    def __init__(self, 
-                 clip_model_name: str = "openai/clip-vit-base-patch32"):
+    def __init__(self):
+        # Bound CPU inference threads for cached models shared by Streamlit workers.
+        torch.set_num_threads(1)
+        self.processor = CLIPProcessor.from_pretrained(MODEL_ID, use_fast=False)
+        self.model = CLIPModel.from_pretrained(MODEL_ID, use_safetensors=True)
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model.to(self.device).eval()
 
-        self.clip_model_name = clip_model_name
-        self._load_clip_model()
-        
-        # Initialize embedding cache
-        self.image_embedding_cache: Dict[str, np.ndarray] = {}
-    
-    def _load_clip_model(self):
-        try:
-            print(f"Loading CLIP model: {self.clip_model_name}...")
-            self.clip_processor = CLIPProcessor.from_pretrained(self.clip_model_name)
-            self.clip_model = CLIPModel.from_pretrained(self.clip_model_name)
+    def generate_embedding_from_pil_image(self, image):
+        image = ImageOps.exif_transpose(image).convert("RGB")
+        inputs = self.processor(images=image, return_tensors="pt").to(self.device)
+        with torch.inference_mode():
+            features = self.model.get_image_features(**inputs)
+            features = features / features.norm(dim=1, keepdim=True)
+        return features.cpu().numpy()[0]
 
-            if torch.cuda.is_available():
-                self.clip_model = self.clip_model.to("cuda")
-                self.device = "cuda"
-            else:
-                self.device = "cpu"
-                
-        except Exception as e:
-            print(f"Warning: Failed to load CLIP model: {e}")
-            self.clip_processor = None
-            self.clip_model = None
-    
-    def download_image(self, image_url: str, convert_to_rgb: bool = True, referer: str = 'https://www.google.com/') -> Optional[Image.Image]:
-        try:
-            if not image_url or not isinstance(image_url, str):
-                print(f"Invalid URL: {image_url}")
-                return None
-                
-            # Parse and validate URL
-            parsed = urllib.parse.urlparse(image_url)
-            if not parsed.scheme or not parsed.netloc:
-                # Add https:// if missing
-                if parsed.netloc == "" and parsed.path != "":
-                    image_url = f"https://{image_url}"
-                else:
-                    print(f"Invalid URL '{image_url}': No scheme or host provided")
-                    return None
-                    
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Referer': referer
-            }
-            
-            # Download the image
-            response = requests.get(image_url, stream=True, headers=headers)
-            response.raise_for_status()
-            
-            # Open image and optionally convert to RGB (needed for CLIP model)
-            image = Image.open(BytesIO(response.content))
-            if convert_to_rgb:
-                image = image.convert('RGB')
-                
-            return image
-        except Exception as e:
-            print(f"Error downloading image from {image_url}: {e}")
-            return None
-    
-    def preprocess_image(self, image: Image.Image) -> dict:
-        if self.clip_processor is None:
-            raise ValueError("CLIP processor not initialized")
-            
-        # Process image using CLIP processor
-        inputs = self.clip_processor(images=image, return_tensors="pt")
-        
-        # Move inputs to the same device as the model
-        if hasattr(self, 'device'):
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            
-        return inputs 
-    
-    def generate_embedding_from_pil_image(self, image: Image.Image) -> np.ndarray:
-        width, height = image.size
-        small_image = image.resize((32, 32))
-        pixels = list(small_image.getdata())
-        image_hash = hash(str(pixels))
-        cache_key = f"pil_image_{image_hash}"
-        
-        # Return cached embedding if available
-        if cache_key in self.image_embedding_cache:
-            return self.image_embedding_cache[cache_key]
-            
-        if self.clip_model is None or self.clip_processor is None:
-            raise ValueError("CLIP model or processor not initialized")
-                
-        inputs = self.preprocess_image(image)
-        
-        # Generate embedding
-        with torch.no_grad():
-            image_features = self.clip_model.get_image_features(**inputs)
-        image_embeddings = image_features / image_features.norm(dim=1, keepdim=True)
-        embedding = image_embeddings.cpu().numpy()[0]
-        self.image_embedding_cache[cache_key] = embedding
-        
-        return embedding
-    
-    def generate_image_embedding(self, image_url: str) -> np.ndarray:
-        if image_url in self.image_embedding_cache:
-            return self.image_embedding_cache[image_url]
-        image = self.download_image(image_url, convert_to_rgb=True)
-        
-        if image is None:
-            raise ValueError(f"Failed to download image from {image_url}")
-            
-        embedding = self.generate_embedding_from_pil_image(image)
-        
-        # Cache the result
-        self.image_embedding_cache[image_url] = embedding
-        
-        return embedding
-
-    def generate_batch_image_embeddings(self, image_urls: List[str]) -> np.ndarray:
-        if not image_urls:
-            return np.array([])
-            
-        embeddings = []
-        valid_indices = []
-        
-        for i, url in enumerate(image_urls):
-            if url and isinstance(url, str) and url.strip():
-                try:
-                    embedding = self.generate_image_embedding(url)
-                    embeddings.append(embedding)
-                    valid_indices.append(i)
-                except Exception as e:
-                    print(f"Skipping URL {url} due to error: {e}")
-        
-        if not embeddings:
-            return np.array([])
-            
-        return np.array(embeddings)
-
+    def generate_batch_image_embeddings(self, image_urls, cache_dir):
+        embeddings, product_ids, failures = [], [], []
+        for product_id, url in enumerate(image_urls):
+            try:
+                image = load_image(url, cache_dir)
+            except (OSError, ValueError, requests.RequestException) as exc:
+                failures.append(product_id)
+                logging.warning("Image unavailable for product %s: %s", product_id, type(exc).__name__)
+                continue
+            embeddings.append(self.generate_embedding_from_pil_image(image))
+            product_ids.append(product_id)
+        return np.asarray(embeddings, dtype=np.float32), product_ids, failures

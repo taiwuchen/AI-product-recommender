@@ -2,3 +2,5 @@ indexes/
 .venv/
 __pycache__/
 .env
+output/
+.playwright-cli/

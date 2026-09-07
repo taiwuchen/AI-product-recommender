@@ -1,0 +1,214 @@
+{
+  "catalog_sha256": "31c3b97c03035f161d3385ad1b46d2893ac7d6acfcc492aee0d1ed90bc6f22e2",
+  "judgments": "Provisional labels authored by the coding assistant from catalog titles and descriptions before running retrieval. Not independently human-reviewed; this is a small diagnostic set, not proof of general search quality.",
+  "queries": [
+    {
+      "query": "a jacket made of linen",
+      "category": "material",
+      "relevant_links": [
+        "https://www.zara.com/in/en/100-linen-jacket-p01437149.html"
+      ],
+      "rationale": "The title and details explicitly say linen jacket; exclude waistcoats and blend overshirts."
+    },
+    {
+      "query": "a jacket made of lyocell",
+      "category": "material",
+      "relevant_links": [
+        "https://www.zara.com/in/en/lyocell-jacket-p05707453.html"
+      ],
+      "rationale": "Explicit lyocell fabric."
+    },
+    {
+      "query": "a wool coat",
+      "category": "material",
+      "relevant_links": [
+        "https://www.zara.com/in/en/100-wool-coat---limited-edition-p05841253.html"
+      ],
+      "rationale": "Explicit wool coat."
+    },
+    {
+      "query": "a faux leather bomber",
+      "category": "material",
+      "relevant_links": [
+        "https://www.zara.com/in/en/faux-leather-bomber-jacket-p03918420.html"
+      ],
+      "rationale": "Both bomber construction and faux leather are stated."
+    },
+    {
+      "query": "a faux suede jacket",
+      "category": "material",
+      "relevant_links": [
+        "https://www.zara.com/in/en/bomber-jacket-with-patch-p03918478.html",
+        "https://www.zara.com/in/en/faux-suede-embroidered-jacket-p08281469.html",
+        "https://www.zara.com/in/en/faux-suede-bomber-jacket-p08574434.html",
+        "https://www.zara.com/in/en/faux-suede-jacket-p06318400.html",
+        "https://www.zara.com/in/en/faux-suede-boxy-fit-jacket-p03548304.html"
+      ],
+      "rationale": "Faux suede appears in the title or description."
+    },
+    {
+      "query": "a cropped denim jacket",
+      "category": "shape",
+      "relevant_links": [
+        "https://www.zara.com/in/en/cropped-denim-jacket-p05520316.html",
+        "https://www.zara.com/in/en/denim-jacket-with-irregular-trims-p04365311.html"
+      ],
+      "rationale": "Both denim and cropped length are stated."
+    },
+    {
+      "query": "a sleeveless linen top",
+      "category": "shape",
+      "relevant_links": [
+        "https://www.zara.com/in/en/100-linen-waistcoat-p07380677.html"
+      ],
+      "rationale": "Linen waistcoat explicitly has no sleeves."
+    },
+    {
+      "query": "an oversized trench coat",
+      "category": "shape",
+      "relevant_links": [
+        "https://www.zara.com/in/en/oversize-trench-coat---limited-edition-p05851368.html"
+      ],
+      "rationale": "Explicit oversized trench coat."
+    },
+    {
+      "query": "a boxy jacket",
+      "category": "shape",
+      "relevant_links": [
+        "https://www.zara.com/in/en/jacket-with-contrast-topstitching-p07505300.html",
+        "https://www.zara.com/in/en/faux-suede-boxy-fit-jacket-p03548304.html",
+        "https://www.zara.com/in/en/boxy-fit-jacket-with-topstitching-p00706555.html",
+        "https://www.zara.com/in/en/boxy-fit-technical-jacket-p09621640.html"
+      ],
+      "rationale": "Boxy fit jacket, excluding the sleeveless gilet."
+    },
+    {
+      "query": "a belted trench coat",
+      "category": "detail",
+      "relevant_links": [
+        "https://www.zara.com/in/en/oversize-trench-coat---limited-edition-p05851368.html",
+        "https://www.zara.com/in/en/double-breasted-technical-trench-coat-p05854300.html"
+      ],
+      "rationale": "Trench coat with a matching belt."
+    },
+    {
+      "query": "a jacket with reflective fabric",
+      "category": "detail",
+      "relevant_links": [
+        "https://www.zara.com/in/en/reflective-effect-jacket-p01732314.html"
+      ],
+      "rationale": "Explicit reflective fabric, not inferred from technical fabric."
+    },
+    {
+      "query": "a denim jacket with contrast stitching",
+      "category": "detail",
+      "relevant_links": [
+        "https://www.zara.com/in/en/denim-jacket-with-contrast-topstitching-p06987325.html"
+      ],
+      "rationale": "Both denim and contrast topstitching are explicit."
+    },
+    {
+      "query": "a jacket with a corduroy collar",
+      "category": "detail",
+      "relevant_links": [
+        "https://www.zara.com/in/en/rubberised-jacket---limited-edition-p03918310.html"
+      ],
+      "rationale": "Explicit contrast corduroy collar."
+    },
+    {
+      "query": "a coat with a removable inner layer",
+      "category": "detail",
+      "relevant_links": [
+        "https://www.zara.com/in/en/water-repellent-trench-coat-with-detachable-gilet-p05854301.html"
+      ],
+      "rationale": "Removable quilted inner gilet."
+    },
+    {
+      "query": "a quilted jacket with a drawstring hem",
+      "category": "detail",
+      "relevant_links": [
+        "https://www.zara.com/in/en/diamond-jacquard-jacket-p06861319.html"
+      ],
+      "rationale": "Explicit quilting and drawstring hem."
+    },
+    {
+      "query": "a coat that repels water",
+      "category": "paraphrase",
+      "relevant_links": [
+        "https://www.zara.com/in/en/water-repellent-trench-coat-with-detachable-gilet-p05854301.html"
+      ],
+      "rationale": "Water-repellent finish stated; technical fabric alone does not qualify."
+    },
+    {
+      "query": "a jacket that shines back when light hits it",
+      "category": "paraphrase",
+      "relevant_links": [
+        "https://www.zara.com/in/en/reflective-effect-jacket-p01732314.html"
+      ],
+      "rationale": "Reflective fabric is the matching property."
+    },
+    {
+      "query": "a denim layer without sleeves",
+      "category": "paraphrase",
+      "relevant_links": [
+        "https://www.zara.com/in/en/denim-utility-gilet-p01538305.html"
+      ],
+      "rationale": "Sleeveless denim utility gilet."
+    },
+    {
+      "query": "a short jean jacket",
+      "category": "paraphrase",
+      "relevant_links": [
+        "https://www.zara.com/in/en/cropped-denim-jacket-p05520316.html",
+        "https://www.zara.com/in/en/denim-jacket-with-irregular-trims-p04365311.html"
+      ],
+      "rationale": "Cropped denim matches short jean jacket."
+    },
+    {
+      "query": "a jacket with fabric that resists tearing",
+      "category": "paraphrase",
+      "relevant_links": [
+        "https://www.zara.com/in/en/textured-weave-technical-jacket-p04391403.html"
+      ],
+      "rationale": "Ripstop fabric explicitly described as resistant to tearing."
+    },
+    {
+      "query": "a coat with two rows of buttons",
+      "category": "paraphrase",
+      "relevant_links": [
+        "https://www.zara.com/in/en/double-breasted-technical-trench-coat-p05854300.html"
+      ],
+      "rationale": "Double-breasted trench coat."
+    },
+    {
+      "query": "a lightweight jacket with a hood",
+      "category": "detail",
+      "relevant_links": [
+        "https://www.zara.com/in/en/reflective-effect-jacket-p01732314.html",
+        "https://www.zara.com/in/en/technical-anorak-windbreaker-p01732312.html",
+        "https://www.zara.com/in/en/technical-windbreaker-jacket-p01732313.html"
+      ],
+      "rationale": "Lightweight fabric and a hood both stated; other hooded jackets have no stated lightweight fabric."
+    },
+    {
+      "query": "a varsity jacket with patches",
+      "category": "detail",
+      "relevant_links": [
+        "https://www.zara.com/in/en/bomber-jacket-with-patch-p03918478.html",
+        "https://www.zara.com/in/en/hooded-bomber-jacket-p03833407.html",
+        "https://www.zara.com/in/en/bomber-jacket-with-patch-p03918392.html",
+        "https://www.zara.com/in/en/faux-suede-embroidered-jacket-p08281469.html"
+      ],
+      "rationale": "Varsity style and patches explicitly present."
+    },
+    {
+      "query": "a rubberised outer layer",
+      "category": "material",
+      "relevant_links": [
+        "https://www.zara.com/in/en/gilet-with-rubberised-finish-p08574440.html",
+        "https://www.zara.com/in/en/rubberised-jacket---limited-edition-p03918310.html"
+      ],
+      "rationale": "Rubberised finish in title or details."
+    }
+  ]
+}

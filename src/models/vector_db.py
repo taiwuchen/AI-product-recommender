@@ -1,227 +1,99 @@
-import os
+import json
+from pathlib import Path
+
 import faiss
 import numpy as np
-import pickle
-from typing import List, Dict, Tuple, Optional, Union
 
 
 class VectorDatabase:
-    def __init__(self, dimension_text: int = 768, dimension_image: int = 512):
-        self.dimension_text = dimension_text
-        self.dimension_image = dimension_image
-        self.index_text = faiss.IndexFlatL2(dimension_text)
-        self.index_image = faiss.IndexFlatL2(dimension_image)
-        self.product_ids = []
+    def __init__(self):
+        self.index_text = None
+        self.index_image = None
+        self.text_ids = []
+        self.image_ids = []
         self.product_texts = []
-        
-    def add_text_embeddings(self, embeddings: np.ndarray, ids: List[int]) -> None:
-        if len(embeddings) == 0:
-            return
 
-        embeddings = embeddings.astype(np.float32)
-        
-        # Check if the embedding dimension matches the index
-        if embeddings.shape[1] != self.dimension_text:
-            print(f"Warning: Embedding dimension mismatch. Expected {self.dimension_text}, got {embeddings.shape[1]}.")
-            self.dimension_text = embeddings.shape[1]
-            self.index_text = faiss.IndexFlatL2(self.dimension_text)
-        elif len(self.product_ids) > 0:
-            # If there are already product IDs, add to an existing index
-            self.index_text = faiss.IndexFlatL2(self.dimension_text)
-            self.product_ids = []
-            
-        # Add to index
-        self.index_text.add(embeddings)
-        self.product_ids.extend(ids)
-        
-    def add_image_embeddings(self, embeddings: np.ndarray, ids: List[int]) -> None:
-        if len(embeddings) == 0:
-            return
+    @staticmethod
+    def _index(embeddings, ids):
+        vectors = np.asarray(embeddings, dtype=np.float32)
+        if vectors.ndim != 2 or len(vectors) != len(ids) or len(set(ids)) != len(ids):
+            raise ValueError("Embeddings must have one row per unique product ID.")
+        if not len(vectors) or not np.isfinite(vectors).all():
+            raise ValueError("Embeddings must be nonempty and finite.")
+        if np.any(np.linalg.norm(vectors, axis=1) == 0):
+            raise ValueError("Zero embeddings cannot be searched.")
+        index = faiss.IndexFlatL2(vectors.shape[1])
+        index.add(np.ascontiguousarray(vectors))
+        return index
 
-        embeddings = embeddings.astype(np.float32)
-        
-        # Check if the embedding dimension matches the index
-        if embeddings.shape[1] != self.dimension_image:
-            print(f"Warning: Image embedding dimension mismatch. Expected {self.dimension_image}, got {embeddings.shape[1]}.")
-            self.dimension_image = embeddings.shape[1]
-            self.index_image = faiss.IndexFlatL2(self.dimension_image)
-        elif self.index_image.ntotal > 0:
-            # If there are already vectors in the index, reset it to start fresh
-            self.index_image = faiss.IndexFlatL2(self.dimension_image)
-            
-        # Add to index
-        self.index_image.add(embeddings)
-    
-    def set_product_texts(self, texts: List[str]) -> None:
-        self.product_texts = texts
-        
-    def search_by_text(self, query_embedding: np.ndarray, k: int = 5, 
-                       query_text: Optional[str] = None, keyword_boost: bool = True) -> Tuple[np.ndarray, np.ndarray]:
-        if self.index_text.ntotal == 0:
-            print("WARNING: Text index is empty. No results can be returned.")
-            return np.array([[0.0] * k]), np.array([[0] * k])
-            
-        if not self.product_ids:
-            print("WARNING: Product IDs list is empty. No results can be returned.")
-            return np.array([[0.0] * k]), np.array([[0] * k])
-            
-        # Check if the embedding dimension matches the index
-        if query_embedding.shape[0] != self.dimension_text:
-            print(f"Warning: Query embedding dimension mismatch. Expected {self.dimension_text}, got {query_embedding.shape[0]}.")
-            return np.array([[0.0] * k]), np.array([[0] * k])
-            
-        query_embedding = query_embedding.astype(np.float32).reshape(1, -1)
-        
-        # Get more results than needed for filtering
-        search_k = min(k * 3, len(self.product_ids)) if keyword_boost and query_text else k
-        
-        # Safety check
-        if search_k <= 0:
-            search_k = 1
-            
-        # Search index
-        distances, indices = self.index_text.search(query_embedding, search_k)
-        
-        # Print detailed information about each result to help with debugging
-        print(f"\nRaw search results:")
-        for i, idx in enumerate(indices[0]):
-            if i < 5:  # Print top 5 results
-                if idx < len(self.product_texts):
-                    product_text = self.product_texts[idx][:100] + "..." if len(self.product_texts[idx]) > 100 else self.product_texts[idx]
-                    print(f"  {i+1}. ID={idx}, Distance={distances[0][i]:.4f}, Text: {product_text}")
-                else:
-                    print(f"  {i+1}. ID={idx}, Distance={distances[0][i]:.4f}, Text: <out of range>")
-        
-        if keyword_boost and query_text and len(self.product_texts) > 0:
-            keywords = [kw.lower() for kw in query_text.split() if len(kw) > 2]
-            
-            print(f"\nKeywords for boosting: {keywords}")
-            
-            if keywords:
-                keyword_scores = {}
-                for i, idx in enumerate(indices[0]):
-                    if idx >= len(self.product_texts):
-                        continue
-                        
-                    text = self.product_texts[idx].lower()
-                    # Base score from vector similarity
-                    score = 1.0 - distances[0][i] / max(distances[0]) if max(distances[0]) > 0 else 1.0
-                    
-                    # Boost for each keyword present
-                    keyword_matches = sum(1 for kw in keywords if kw in text)
-                    if keyword_matches > 0:
-                        # Significantly boost score for keyword matches
-                        score *= (1.0 + 0.5 * keyword_matches)
-                        
-                    keyword_scores[idx] = score
-                    print(f"  Product {idx} - Keywords matches: {keyword_matches}, Score: {score:.4f}")
-                    
-                # Sort by new scores
-                if keyword_scores:
-                    sorted_results = sorted(keyword_scores.items(), key=lambda x: x[1], reverse=True)[:k]
-                    
-                    # Print the new ranking after keyword boosting
-                    print("\nNew ranking after keyword boosting:")
-                    for rank, (idx, score) in enumerate(sorted_results):
-                        product_text = self.product_texts[idx][:100] + "..." if len(self.product_texts[idx]) > 100 else self.product_texts[idx]
-                        print(f"  {rank+1}. ID={idx}, Boosted Score={score:.4f}, Text: {product_text}")
-                    
-                    # Convert to numpy arrays
-                    new_indices = np.array([[idx for idx, _ in sorted_results]])
-                    new_distances = np.array([[1.0 - score for _, score in sorted_results]])
-                    
-                    return new_distances, new_indices
-        
-        # Return original results if no keyword boosting or no keywords found
-        result_k = min(k, indices.shape[1])
-        print(f"\nReturning {result_k} raw search results")
-        return distances, indices[:, :result_k]
-    
-    def search_by_image(self, query_embedding: np.ndarray, k: int = 5) -> Tuple[np.ndarray, np.ndarray]:
-        if self.index_image.ntotal == 0:
-            print("WARNING: Image index is empty. No results can be returned.")
-            return np.array([[0.0] * k]), np.array([[0] * k])
-            
-        if not self.product_ids:
-            print("WARNING: Product IDs list is empty. No results can be returned.")
-            return np.array([[0.0] * k]), np.array([[0] * k])
-            
-        if query_embedding.shape[0] != self.dimension_image:
-            print(f"Warning: Query image embedding dimension mismatch. Expected {self.dimension_image}, got {query_embedding.shape[0]}.")
-            return np.array([[0.0] * k]), np.array([[0] * k])
+    def add_text_embeddings(self, embeddings, ids):
+        self.index_text = self._index(embeddings, ids)
+        self.text_ids = list(ids)
 
-        query_embedding = query_embedding.astype(np.float32).reshape(1, -1)
+    def add_image_embeddings(self, embeddings, ids):
+        self.index_image = self._index(embeddings, ids)
+        self.image_ids = list(ids)
 
-        distances, indices = self.index_image.search(query_embedding, k)
-        
-        # For L2 distance, lower is better, so we need to invert the scale
-        max_dist = np.max(distances) if np.max(distances) > 0 else 1.0
-        similarity_scores = 1.0 - (distances / max_dist)
-        
-        print(f"\nImage search results:")
-        for i, idx in enumerate(indices[0]):
-            if idx < len(self.product_ids):
-                product_id = self.product_ids[idx]
-                product_text = ""
-                if idx < len(self.product_texts):
-                    product_text = self.product_texts[idx][:100] + "..." if len(self.product_texts[idx]) > 100 else self.product_texts[idx]
-                
-                print(f"  {i+1}. ID={product_id}, Distance={distances[0][i]:.4f}, " 
-                      f"Similarity Score={similarity_scores[0][i]:.4f}" +
-                      (f", Text: {product_text}" if product_text else ""))
-            else:
-                print(f"  {i+1}. ID=<out of range>, Distance={distances[0][i]:.4f}, "
-                      f"Similarity Score={similarity_scores[0][i]:.4f}")
-        
-        return distances, indices
-    
-    def save_indices(self, save_dir: str) -> None: 
-        os.makedirs(save_dir, exist_ok=True)
-        faiss.write_index(self.index_text, os.path.join(save_dir, 'text_index.faiss'))
-        faiss.write_index(self.index_image, os.path.join(save_dir, 'image_index.faiss'))
-        
-        # Save product IDs and texts
-        with open(os.path.join(save_dir, 'product_ids.pkl'), 'wb') as f:
-            pickle.dump(self.product_ids, f)
-            
-        # Save product texts for keyword filtering
-        with open(os.path.join(save_dir, 'product_texts.pkl'), 'wb') as f:
-            pickle.dump(self.product_texts, f)
-            
-        # Save dimensions
-        with open(os.path.join(save_dir, 'dimensions.pkl'), 'wb') as f:
-            pickle.dump({'text': self.dimension_text, 'image': self.dimension_image}, f)
-    
-    def load_indices(self, save_dir: str) -> None:
-        try:
-            with open(os.path.join(save_dir, 'dimensions.pkl'), 'rb') as f:
-                dimensions = pickle.load(f)
-                self.dimension_text = dimensions.get('text', self.dimension_text)
-                self.dimension_image = dimensions.get('image', self.dimension_image)
-        except (FileNotFoundError, EOFError):
-            pass
-            
-        # Load text index
-        self.index_text = faiss.read_index(os.path.join(save_dir, 'text_index.faiss'))
-        
-        # Update dimension from loaded index
-        if hasattr(self.index_text, 'd'):
-            self.dimension_text = self.index_text.d
-        
-        # Load image index
-        self.index_image = faiss.read_index(os.path.join(save_dir, 'image_index.faiss'))
-        
-        # Update dimension from loaded index
-        if hasattr(self.index_image, 'd'):
-            self.dimension_image = self.index_image.d
-        
-        # Load product IDs
-        with open(os.path.join(save_dir, 'product_ids.pkl'), 'rb') as f:
-            self.product_ids = pickle.load(f)
-            
-        # Try to load product texts if available
-        try:
-            with open(os.path.join(save_dir, 'product_texts.pkl'), 'rb') as f:
-                self.product_texts = pickle.load(f)
-        except (FileNotFoundError, EOFError):
-            self.product_texts = []
+    def set_product_texts(self, texts):
+        if len(texts) != len(self.text_ids):
+            raise ValueError("Text metadata must match the text index.")
+        self.product_texts = list(texts)
+
+    @staticmethod
+    def _search(index, embedding, k):
+        if k < 1:
+            raise ValueError("Result count must be positive.")
+        if index is None or index.ntotal == 0:
+            return np.empty((1, 0)), np.empty((1, 0), dtype=int)
+        vector = np.asarray(embedding, dtype=np.float32).reshape(1, -1)
+        if vector.shape[1] != index.d or not np.isfinite(vector).all() or not np.linalg.norm(vector):
+            raise ValueError("Query embedding is invalid or has the wrong dimension.")
+        return index.search(vector, min(k, index.ntotal))
+
+    def search_by_text(self, query_embedding, k=5, query_text=None, keyword_boost=False):
+        count = k * 3 if keyword_boost and query_text else k
+        distances, positions = self._search(self.index_text, query_embedding, count)
+        if keyword_boost and query_text and positions.size:
+            keywords = [word.lower() for word in query_text.split() if len(word) > 2]
+            largest = float(distances.max())
+            scores = 1 - distances[0] / largest if largest > 0 else np.ones(positions.shape[1])
+            for i, position in enumerate(positions[0]):
+                matches = sum(word in self.product_texts[position].lower() for word in keywords)
+                scores[i] *= 1 + 0.5 * matches
+            order = np.argsort(-scores, kind="stable")[:k]
+            positions = positions[:, order]
+            distances = distances[:, order]
+        else:
+            positions, distances = positions[:, :k], distances[:, :k]
+        ids = np.array([[self.text_ids[p] for p in positions[0]]], dtype=int)
+        return distances, ids
+
+    def search_by_image(self, query_embedding, k=5):
+        distances, positions = self._search(self.index_image, query_embedding, k)
+        ids = np.array([[self.image_ids[p] for p in positions[0]]], dtype=int)
+        return distances, ids
+
+    def save_indices(self, save_dir):
+        path = Path(save_dir)
+        path.mkdir(parents=True, exist_ok=True)
+        for name, index in [("text", self.index_text), ("image", self.index_image)]:
+            if index is not None:
+                faiss.write_index(index, str(path / f"{name}.faiss"))
+        (path / "metadata.json").write_text(json.dumps({
+            "text_ids": self.text_ids, "image_ids": self.image_ids,
+            "product_texts": self.product_texts,
+        }))
+
+    def load_indices(self, save_dir):
+        path = Path(save_dir)
+        metadata = json.loads((path / "metadata.json").read_text())
+        self.text_ids = metadata["text_ids"]
+        self.image_ids = metadata["image_ids"]
+        self.product_texts = metadata["product_texts"]
+        for name, ids in [("text", self.text_ids), ("image", self.image_ids)]:
+            index = faiss.read_index(str(path / f"{name}.faiss")) if ids else None
+            if index is not None and (index.ntotal != len(ids) or len(set(ids)) != len(ids)):
+                raise ValueError("Saved index does not match its product IDs.")
+            setattr(self, f"index_{name}", index)
+        if len(self.product_texts) != len(self.text_ids):
+            raise ValueError("Saved text metadata does not match the index.")

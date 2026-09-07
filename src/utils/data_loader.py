@@ -1,43 +1,32 @@
 import pandas as pd
-from typing import List, Dict, Optional
 
 
 class ProductDataLoader:
-    def __init__(self, data_path: str):
+    def __init__(self, data_path):
         self.data_path = data_path
         self.df = None
-        
-    def load_data(self) -> pd.DataFrame:
-        self.df = pd.read_csv(self.data_path)
-        return self.df
-    
-    def preprocess_data(self) -> pd.DataFrame:
-        if self.df is None:
-            self.load_data()
 
-        self.df['image_url'] = self.df['product_images'].apply(lambda x: x.strip() if isinstance(x, str) and x.startswith('http') else "")
-        self.df['text_for_embedding'] = self.df['product_name'] + '. ' + self.df['details'].fillna('')
-        
+    def preprocess_data(self):
+        df = pd.read_csv(self.data_path).fillna("")
+        required = {"product_name", "link", "product_images", "details"}
+        if not required.issubset(df.columns) or df.empty:
+            raise ValueError("Catalog must contain products with name, link, image, and details columns.")
+        if not df["product_name"].str.strip().all() or not df["link"].is_unique:
+            raise ValueError("Products need nonempty names and unique links.")
+        df["image_url"] = df["product_images"].str.strip()
+        df["details"] = df["details"].str.replace("View more", "", regex=False).str.strip()
+        df["text_for_embedding"] = df["product_name"] + ". " + df["details"]
+        self.df = df.reset_index(drop=True)
         return self.df
-    
-    def get_product_details(self, product_indices: List[int]) -> List[Dict]:
+
+    def get_product_details(self, product_indices):
         if self.df is None:
             self.preprocess_data()
-            
         products = []
         for idx in product_indices:
-            if 0 <= idx < len(self.df):
-                image_url = self.df.loc[idx, 'image_url']
-                # Set to None if the extracted URL was empty
-                if not image_url: 
-                    image_url = None
-                
-                product = {
-                    'name': self.df.loc[idx, 'product_name'],
-                    'details': self.df.loc[idx, 'details'],
-                    'image_url': image_url,
-                    'link': self.df.loc[idx, 'link']
-                }
-                products.append(product)
-                
+            if not 0 <= idx < len(self.df):
+                raise ValueError(f"Unknown product ID: {idx}")
+            row = self.df.iloc[idx]
+            products.append({"id": int(idx), "name": row["product_name"], "details": row["details"],
+                             "image_url": row["image_url"], "link": row["link"]})
         return products
