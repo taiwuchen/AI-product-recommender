@@ -78,7 +78,7 @@ def evaluate(modes, output):
               "queries_sha256": hashlib.sha256((ROOT / "evaluation/queries.json").read_bytes()).hexdigest(),
               "judgments": dataset["judgments"], "python": platform.python_version(), "platform": platform.platform(),
               "products": len(df), "queries": len(dataset["queries"]), "setup_ms": setup_ms,
-              "text_model": "text-embedding-005" if model else None, "summary": summary, "per_query": rows}
+              "text_model": MODEL_ID if model else None, "summary": summary, "per_query": rows}
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.with_suffix(".json").write_text(json.dumps(report, indent=2))

@@ -1,6 +1,6 @@
 # Semantic Product Search
 
-Find fashion products using a description or a reference photo. A local search application built by Taiwu Chen with Streamlit, Google text embeddings, CLIP, and FAISS.
+Find fashion products using a description or a reference photo. A local search application built by Taiwu Chen with Streamlit, OpenAI text embeddings through OpenRouter, CLIP, and FAISS.
 
 The project explores a concrete question: can shoppers find an item without knowing the exact words used in its listing? It searches 66 archival ZARA menswear products and lets you compare keyword retrieval with semantic retrieval and keyword boosting.
 
@@ -27,25 +27,29 @@ streamlit run src/app/streamlit_app.py
 
 The catalog and keyword method work without cloud credentials. Image search downloads the CLIP model on first use and runs inference locally. Product images are downloaded from their catalog URLs and cached locally.
 
-For semantic search, copy `.env.example` to `.env` and set `GOOGLE_CLOUD_PROJECT` to your own project with Vertex AI enabled and embedding access. Authenticate using:
+For semantic search, copy `.env.example` to `.env` and set your OpenRouter API key:
 
 ```bash
-gcloud auth application-default login
+cp .env.example .env
 ```
 
-Alternatively, set `GOOGLE_APPLICATION_CREDENTIALS` to a service account file. Semantic search sends listing text and search queries to Google's embedding API and may incur API charges. No OpenRouter key or text-generation service is needed.
+```dotenv
+OPENROUTER_API_KEY=your_key_here
+```
+
+Semantic search sends listing text and search queries to OpenRouter and the serving provider. It requires internet access and an OpenRouter account with embedding access and sufficient credits. Google Cloud credentials are not needed. No text-generation service is used.
 
 ## How it works
 
 ```mermaid
 flowchart LR
     CSV[Product catalog] --> Prepare[Validate and prepare listings]
-    Prepare --> TE[Google document embeddings]
+    Prepare --> TE[OpenRouter text embeddings]
     Prepare --> IE[Cached images and CLIP]
     Prepare --> KW[TF-IDF keyword index]
     TE --> TI[FAISS text index]
     IE --> II[FAISS image index + product IDs]
-    Query[Text query] --> QE[Google query embedding]
+    Query[Text query] --> QE[OpenRouter text embedding]
     QE --> TI
     Query --> KW
     Photo[Reference photo] --> CLIP[CLIP embedding]
@@ -57,7 +61,7 @@ flowchart LR
     Evidence --> UI[Streamlit results]
 ```
 
-Text search uses `text-embedding-005` with separate document and query task types through the Google Gen AI SDK. Image search uses `openai/clip-vit-base-patch32`. The two embedding spaces have separate indexes; this app does not combine a text query and photo into a joint query.
+Text search uses `openai/text-embedding-3-small` through OpenRouter with 1,536-dimensional vectors. Queries and documents use the same embedding method. API responses are reordered by their input indices and checked for missing rows, duplicates, invalid dimensions, and nonfinite or zero vectors before indexing. Image search uses `openai/clip-vit-base-patch32`. The two embedding spaces have separate indexes; this app does not combine a text query and photo into a joint query.
 
 FAISS performs exact squared Euclidean search. At 66 products, approximate search and a hosted vector database would add complexity without a demonstrated need. CLIP embeddings are normalized. Retrieval scores are not displayed as confidence percentages.
 
@@ -94,7 +98,7 @@ python -m evaluation.run --modes keyword --output evaluation/keyword-results
 
 The runner writes JSON with every ranked result and Markdown with P@5, Recall@5, nDCG@5, MRR@5, median latency, p95 latency, and the lowest-ranked cases. It checks the catalog hash so labels cannot silently outlive their dataset. Search timing includes query embedding and retrieval, excluding initial setup, downloads, and rendering. Semantic methods share one query embedding per query for a fair comparison.
 
-See the [measured keyword baseline](evaluation/keyword-results.md). A full semantic comparison requires working Google credentials; do not infer semantic improvement from the keyword-only report.
+See the [measured keyword baseline](evaluation/keyword-results.md). A full semantic comparison requires a working OpenRouter API key; do not infer semantic improvement from the keyword-only report.
 
 Precision at five is capped below 1 when the catalog has fewer than five relevant products. Recall and nDCG make those cases easier to interpret. This small diagnostic set does not establish generalization, personalized recommendation quality, image-search relevance, or production latency.
 
@@ -127,4 +131,4 @@ tests/                   Retrieval and persistence regression checks
 - The initial model download and image indexing are slower than subsequent searches.
 - Product descriptions and photos belong to their respective owners. This independent portfolio project is not affiliated with ZARA. The repository does not establish a license for third-party assets.
 
-Google's [embedding documentation](https://cloud.google.com/vertex-ai/generative-ai/docs/embeddings/get-text-embeddings) describes the model and retrieval task types. Streamlit's [forms documentation](https://docs.streamlit.io/develop/concepts/architecture/forms) explains how search submissions are batched.
+OpenRouter's [embedding API documentation](https://openrouter.ai/docs/api/api-reference/embeddings/submit-an-embedding-request) describes the request and response format. Streamlit's [forms documentation](https://docs.streamlit.io/develop/concepts/architecture/forms) explains how search submissions are batched.

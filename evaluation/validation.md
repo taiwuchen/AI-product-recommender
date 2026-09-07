@@ -1,5 +1,15 @@
 # Verification record
 
+## OpenRouter model update
+
+Verified after replacing Google text embeddings with `openai/text-embedding-3-small` through OpenRouter:
+
+- **Pass:** 17 regression checks with the updated dependency lock installed, including reordered API responses, batch boundaries, HTTP failures, invalid vectors, and a 1,536-dimensional index build/load/search round trip.
+- **Pass:** Streamlit AppTest confirms the app loads without Google packages, keyword search returns the expected first product, and semantic search requests `OPENROUTER_API_KEY` when it is missing.
+- **Pending:** No OpenRouter API key was configured during verification, so live text embeddings and the full semantic/boosted evaluation have not been run. The API tests use mocked responses and do not establish live provider access or retrieval quality.
+
+## Portfolio baseline verification
+
 Verified locally on September 7, 2026, using Python 3.12 and the dependencies in `requirements.lock`.
 
 - **Pass:** 13 unit regression checks (`python -m unittest discover -s tests -v`).

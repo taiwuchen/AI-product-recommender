@@ -13,7 +13,7 @@ def catalog_fingerprint(data_path):
 
 def index_key(data_path, kind, model_id):
     signature = {"catalog": catalog_fingerprint(data_path), "kind": kind,
-                 "model": model_id, "preprocessing": 1, "task": "RETRIEVAL_DOCUMENT" if kind == "text" else "image"}
+                 "model": model_id, "preprocessing": 1, "task": "text" if kind == "text" else "image"}
     return hashlib.sha256(json.dumps(signature, sort_keys=True).encode()).hexdigest()
 
 
@@ -27,7 +27,7 @@ def load_or_build(data_path, df, indexes_dir, kind, model_id, generator_factory)
         return db, json.loads((destination / "build.json").read_text())
     generator = generator_factory()
     if kind == "text":
-        vectors = generator.generate_text_embedding(df["text_for_embedding"].tolist(), task_type="RETRIEVAL_DOCUMENT")
+        vectors = generator.generate_text_embedding(df["text_for_embedding"].tolist())
         db.add_text_embeddings(vectors, list(range(len(df))))
         db.set_product_texts(df["text_for_embedding"].tolist())
         failed = []
