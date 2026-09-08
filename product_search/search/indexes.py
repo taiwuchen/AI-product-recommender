@@ -4,7 +4,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from src.models.vector_db import VectorDatabase
+from product_search.models.vector_db import VectorDatabase
 
 
 def catalog_fingerprint(data_path):

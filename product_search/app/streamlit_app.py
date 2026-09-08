@@ -1,4 +1,3 @@
-import sys
 import time
 from pathlib import Path
 
@@ -6,22 +5,19 @@ import streamlit as st
 from dotenv import load_dotenv
 from PIL import Image, ImageOps
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
+from product_search.config import INDEXES_DIR, ROOT, catalog_path
+from product_search.search.explanations import product_evidence
+from product_search.search.indexes import catalog_fingerprint, load_or_build
+from product_search.search.keyword import KeywordSearch
+from product_search.utils.data_loader import ProductDataLoader
+from product_search.utils.images import load_image
+
 load_dotenv(ROOT / ".env")
-
-from src.search.explanations import product_evidence
-from src.search.indexes import catalog_fingerprint, load_or_build
-from src.search.keyword import KeywordSearch
-from src.utils.data_loader import ProductDataLoader
-from src.utils.images import load_image
-
-DATA_PATH = ROOT / "ZARA_jackets_men.csv"
-INDEXES_DIR = ROOT / "indexes"
+DATA_PATH = catalog_path()
 MODES = ["Semantic", "Semantic + keywords", "Keyword"]
 
 st.set_page_config(page_title="Semantic Product Search", layout="wide")
-st.html(ROOT / "src/app/style.css")
+st.html(Path(__file__).with_name("style.css"))
 
 
 @st.cache_resource
@@ -33,23 +29,26 @@ def catalog(fingerprint):
 
 @st.cache_resource
 def text_model():
-    from src.models.text_embedding import TextEmbeddingGenerator
+    from product_search.models.text_embedding import TextEmbeddingGenerator
     return TextEmbeddingGenerator()
 
 
 @st.cache_resource
 def image_model():
-    from src.models.image_embedding import ImageEmbeddingGenerator
+    try:
+        from product_search.models.image_embedding import ImageEmbeddingGenerator
+    except ImportError as exc:
+        raise ImportError("Image search needs the optional dependencies. Run `uv sync --extra image`.") from exc
     return ImageEmbeddingGenerator()
 
 
 @st.cache_resource
 def search_index(kind, fingerprint):
     if kind == "text":
-        from src.models.text_embedding import MODEL_ID
+        from product_search.models.text_embedding import MODEL_ID
         factory = text_model
     else:
-        from src.models.image_embedding import MODEL_ID
+        from product_search.models.image_embedding import MODEL_ID
         factory = image_model
     df, _, _ = catalog(fingerprint)
     return load_or_build(DATA_PATH, df, INDEXES_DIR, kind, MODEL_ID, factory)

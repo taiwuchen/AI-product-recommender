@@ -2,26 +2,24 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from pathlib import Path
 
-from src.models.image_embedding import MODEL_ID, ImageEmbeddingGenerator
-from src.search.indexes import load_or_build
-from src.utils.data_loader import ProductDataLoader
-from src.utils.images import load_image
-
-ROOT = Path(__file__).resolve().parents[1]
+from product_search.config import DEFAULT_CATALOG, INDEXES_DIR, ROOT
+from product_search.models.image_embedding import MODEL_ID, ImageEmbeddingGenerator
+from product_search.search.indexes import load_or_build
+from product_search.utils.data_loader import ProductDataLoader
+from product_search.utils.images import load_image
 
 
 def run():
-    data_path = ROOT / "ZARA_jackets_men.csv"
+    data_path = DEFAULT_CATALOG
     df = ProductDataLoader(data_path).preprocess_data()
     with ThreadPoolExecutor(max_workers=1) as pool:
         model = pool.submit(ImageEmbeddingGenerator).result()
-    db, report = load_or_build(data_path, df, ROOT / "indexes", "image", MODEL_ID, lambda: model)
+    db, report = load_or_build(data_path, df, INDEXES_DIR, "image", MODEL_ID, lambda: model)
     reference_id = 27
     if reference_id not in db.image_ids:
         raise ValueError("Reference image is unavailable; choose and document another reference.")
-    reference = load_image(df.iloc[reference_id]["image_url"], ROOT / "indexes/images")
+    reference = load_image(df.iloc[reference_id]["image_url"], INDEXES_DIR / "images")
     runs = []
     for _ in range(3):
         with ThreadPoolExecutor(max_workers=1) as pool:

@@ -10,11 +10,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from src.search.indexes import catalog_fingerprint, load_or_build
-from src.search.keyword import KeywordSearch
-from src.utils.data_loader import ProductDataLoader
-
-ROOT = Path(__file__).resolve().parents[1]
+from product_search.config import INDEXES_DIR, ROOT, catalog_path
+from product_search.search.indexes import catalog_fingerprint, load_or_build
+from product_search.search.keyword import KeywordSearch
+from product_search.utils.data_loader import ProductDataLoader
 
 
 def metrics(retrieved, relevant, k=5):
@@ -25,10 +24,11 @@ def metrics(retrieved, relevant, k=5):
             "ndcg_at_5": dcg / ideal, "reciprocal_rank_at_5": next((1 / (i + 1) for i, hit in enumerate(hits) if hit), 0)}
 
 
-def evaluate(modes, output):
+def evaluate(modes, output, queries):
     load_dotenv(ROOT / ".env")
-    data_path = ROOT / "ZARA_jackets_men.csv"
-    dataset = json.loads((ROOT / "evaluation/queries.json").read_text())
+    data_path = catalog_path()
+    queries = Path(queries)
+    dataset = json.loads(queries.read_text())
     if dataset["catalog_sha256"] != catalog_fingerprint(data_path):
         raise ValueError("Catalog changed. Review the relevance labels before evaluating.")
     loader = ProductDataLoader(data_path)
@@ -41,9 +41,9 @@ def evaluate(modes, output):
     model = db = None
     setup_start = time.perf_counter()
     if any(mode != "keyword" for mode in modes):
-        from src.models.text_embedding import MODEL_ID, TextEmbeddingGenerator
+        from product_search.models.text_embedding import MODEL_ID, TextEmbeddingGenerator
         model = TextEmbeddingGenerator()
-        db, _ = load_or_build(data_path, df, ROOT / "indexes", "text", MODEL_ID, lambda: model)
+        db, _ = load_or_build(data_path, df, INDEXES_DIR, "text", MODEL_ID, lambda: model)
         model.generate_text_embedding("jacket")
     setup_ms = (time.perf_counter() - setup_start) * 1000
     rows = []
@@ -75,7 +75,7 @@ def evaluate(modes, output):
         times = sorted(row["search_ms"] for row in values)
         summary[mode].update(median_search_ms=statistics.median(times), p95_search_ms=times[math.ceil(len(times) * .95) - 1])
     report = {"generated_at": datetime.now(timezone.utc).isoformat(), "catalog_sha256": dataset["catalog_sha256"],
-              "queries_sha256": hashlib.sha256((ROOT / "evaluation/queries.json").read_bytes()).hexdigest(),
+              "queries_sha256": hashlib.sha256(queries.read_bytes()).hexdigest(),
               "judgments": dataset["judgments"], "python": platform.python_version(), "platform": platform.platform(),
               "products": len(df), "queries": len(dataset["queries"]), "setup_ms": setup_ms,
               "text_model": MODEL_ID if model else None, "summary": summary, "per_query": rows}
@@ -104,5 +104,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--modes", nargs="+", choices=["keyword", "semantic", "boosted"], default=["keyword", "semantic", "boosted"])
     parser.add_argument("--output", default="evaluation/results")
+    parser.add_argument("--queries", default="evaluation/queries.json")
     args = parser.parse_args()
-    evaluate(args.modes, args.output)
+    evaluate(args.modes, args.output, args.queries)

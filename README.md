@@ -2,7 +2,11 @@
 
 Find fashion products using a description or a reference photo. A local search application built by Taiwu Chen with Streamlit, OpenAI text embeddings through OpenRouter, CLIP, and FAISS.
 
-The project explores a concrete question: can shoppers find an item without knowing the exact words used in its listing? It searches 66 archival ZARA menswear products and lets you compare keyword retrieval with semantic retrieval and keyword boosting.
+The project explores a concrete question: can shoppers find an item without knowing the exact words used in its listing? It ships with 66 archival ZARA menswear products, works with any catalog CSV, and lets you compare keyword retrieval with semantic retrieval and keyword boosting.
+
+![Search results for "a coat with a removable inner layer"](docs/screenshot.png)
+
+Some archival image links no longer resolve; those products show an "Image unavailable" placeholder, as in the screenshot.
 
 ## What you can try
 
@@ -16,18 +20,24 @@ This is catalog search, not a personalized recommendation system. It has no user
 
 ## Run locally
 
-Use `uv` and Python 3.12. No deployment is required. On macOS, install uv with `brew install uv` if needed.
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.12 or newer. On macOS, `brew install uv`.
 
 ```bash
-uv venv --python 3.12 .venv
-uv pip sync requirements.lock
-source .venv/bin/activate
-streamlit run src/app/streamlit_app.py
+git clone https://github.com/taiwuchen/semantic-product-search.git
+cd semantic-product-search
+uv sync
+uv run streamlit run product_search/app/streamlit_app.py
 ```
 
-For an existing `.venv`, skip the creation step. Use `uv pip sync requirements.lock` to install dependencies; `pip` is not bundled with uv-created environments.
+`uv sync` creates `.venv` from the lockfile and installs the project. Keyword search works immediately with no credentials.
 
-The catalog and keyword method work without cloud credentials. Image search downloads the CLIP model on first use and runs inference locally. Product images are downloaded from their catalog URLs and cached locally.
+Image search needs PyTorch and Transformers, which add roughly two gigabytes. Install them only if you want it:
+
+```bash
+uv sync --extra image
+```
+
+The CLIP model downloads on first use and runs inference locally on CPU. On Linux, uv installs CPU-only PyTorch wheels. Product images are downloaded from their catalog URLs and cached locally.
 
 For semantic search, copy `.env.example` to `.env` and set your OpenRouter API key:
 
@@ -39,7 +49,26 @@ cp .env.example .env
 OPENROUTER_API_KEY=your_key_here
 ```
 
-Semantic search sends listing text and search queries to OpenRouter and the serving provider. It requires internet access and an OpenRouter account with embedding access and sufficient credits. Google Cloud credentials are not needed. No text-generation service is used.
+Semantic search sends listing text and search queries to OpenRouter and the serving provider. It requires internet access and an OpenRouter account with embedding access and sufficient credits. No text-generation service is used.
+
+## Bring your own catalog
+
+The app reads any CSV with these columns:
+
+| Column | Content |
+|---|---|
+| `product_name` | Nonempty display name |
+| `link` | Unique product URL, used as the product identity |
+| `product_images` | Image URL, may be empty |
+| `details` | Listing text that is embedded and searched |
+
+Point `CATALOG_PATH` at the file, either in `.env` or on the command line:
+
+```bash
+CATALOG_PATH=~/catalogs/shoes.csv uv run streamlit run product_search/app/streamlit_app.py
+```
+
+Each catalog gets its own indexes under `indexes/`, keyed by the file hash and model. Embedding a new catalog calls OpenRouter once per listing batch. The relevance labels in `evaluation/queries.json` belong to the bundled ZARA catalog; write your own query set before evaluating another dataset.
 
 ## How it works
 
@@ -89,14 +118,16 @@ The [24-query set](evaluation/queries.json) contains material, shape, detail, an
 Run the three methods on the same queries:
 
 ```bash
-python -m evaluation.run
+uv run python -m evaluation.run
 ```
 
 Run only the credential-free baseline:
 
 ```bash
-python -m evaluation.run --modes keyword --output evaluation/keyword-results
+uv run python -m evaluation.run --modes keyword --output evaluation/keyword-results
 ```
+
+Pass `--queries` to evaluate a different label file against the catalog set by `CATALOG_PATH`.
 
 The runner writes JSON with every ranked result and Markdown with P@5, Recall@5, nDCG@5, MRR@5, median latency, p95 latency, and the lowest-ranked cases. It checks the catalog hash so labels cannot silently outlive their dataset. Search timing includes query embedding and retrieval, excluding initial setup, downloads, and rendering. Semantic methods share one query embedding per query for a fair comparison.
 
@@ -115,20 +146,23 @@ Precision at five is capped below 1 when the catalog has fewer than five relevan
 ## Verify
 
 ```bash
-python -m unittest discover -s tests -v
+uv run python -m unittest discover -s tests -v
 ```
 
-See the [verification record](evaluation/validation.md) for earlier checks; the live comparison above completes the previously pending OpenRouter evaluation. For a live CLIP check across successive worker threads, run `python -m evaluation.image_smoke`.
+The tests run offline and mock every network call. GitHub Actions runs them on every push and pull request.
+
+See the [verification record](evaluation/validation.md) for earlier checks; the live comparison above completes the previously pending OpenRouter evaluation. For a live CLIP check across successive worker threads, run `uv run python -m evaluation.image_smoke`.
 
 Regression checks cover failed image downloads and ID alignment after saving/reloading, index reuse, invalid vectors, small and empty catalogs, source-grounded excerpts, and evaluation metrics.
 
 ## Project layout
 
 ```text
-src/app/                 Streamlit presentation and styling
-src/models/              Text/image embedding clients and FAISS storage
-src/search/              Index preparation, keyword retrieval, listing evidence
-src/utils/               Catalog validation and cached image loading
+product_search/app/      Streamlit presentation and styling
+product_search/models/   Text/image embedding clients and FAISS storage
+product_search/search/   Index preparation, keyword retrieval, listing evidence
+product_search/utils/    Catalog validation and cached image loading
+product_search/config.py Catalog and index locations
 evaluation/              Queries, metrics runner, measured reports
 tests/                   Retrieval and persistence regression checks
 ```
@@ -140,5 +174,9 @@ tests/                   Retrieval and persistence regression checks
 - Image similarity can reflect backgrounds and poses as well as garments. It cannot confirm materials from a photo.
 - The initial model download and image indexing are slower than subsequent searches.
 - Product descriptions and photos belong to their respective owners. This independent portfolio project is not affiliated with ZARA. The repository does not establish a license for third-party assets.
+
+## Contributing and license
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and expectations. The code is released under the [MIT License](LICENSE). The bundled ZARA listing text and linked images are third-party content and are not covered by that license.
 
 OpenRouter's [embedding API documentation](https://openrouter.ai/docs/api/api-reference/embeddings/submit-an-embedding-request) describes the request and response format. Streamlit's [forms documentation](https://docs.streamlit.io/develop/concepts/architecture/forms) explains how search submissions are batched.

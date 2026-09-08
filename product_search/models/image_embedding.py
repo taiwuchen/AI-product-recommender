@@ -6,7 +6,7 @@ import torch
 from PIL import ImageOps
 from transformers import CLIPModel, CLIPProcessor
 
-from src.utils.images import load_image
+from product_search.utils.images import load_image
 
 MODEL_ID = "openai/clip-vit-base-patch32"
 

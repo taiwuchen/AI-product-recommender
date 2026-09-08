@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import requests
 
-from src.models.text_embedding import DIMENSIONS, ENDPOINT, MODEL_ID, TextEmbeddingGenerator
+from product_search.models.text_embedding import DIMENSIONS, ENDPOINT, MODEL_ID, TextEmbeddingGenerator
 
 
 def response_for(values):
@@ -21,7 +21,7 @@ class TextEmbeddingTests(unittest.TestCase):
         with patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}):
             self.model = TextEmbeddingGenerator()
 
-    @patch("src.models.text_embedding.requests.post")
+    @patch("product_search.models.text_embedding.requests.post")
     def test_batches_restore_input_order_from_response_indices(self, post):
         first = response_for(range(1, 65))
         first.json.return_value["data"].reverse()
@@ -38,20 +38,20 @@ class TextEmbeddingTests(unittest.TestCase):
         self.assertEqual(calls[1].kwargs["json"]["input"], texts[64:])
         self.assertEqual(calls[0].kwargs["timeout"], (5, 30))
 
-    @patch("src.models.text_embedding.requests.post")
+    @patch("product_search.models.text_embedding.requests.post")
     def test_query_returns_one_vector(self, post):
         post.return_value = response_for([1])
         self.assertEqual(self.model.generate_text_embedding("denim").shape, (DIMENSIONS,))
         post.return_value.raise_for_status.assert_called_once()
 
-    @patch("src.models.text_embedding.requests.post")
+    @patch("product_search.models.text_embedding.requests.post")
     def test_empty_or_invalid_input_never_calls_api(self, post):
         for value in [" ", [], ["denim", ""], [None], 42, {"text": "denim"}]:
             with self.subTest(value=value), self.assertRaises(ValueError):
                 self.model.generate_text_embedding(value)
         post.assert_not_called()
 
-    @patch("src.models.text_embedding.requests.post")
+    @patch("product_search.models.text_embedding.requests.post")
     def test_invalid_response_never_reaches_index(self, post):
         valid = {"index": 0, "embedding": [1] * DIMENSIONS}
         invalid_batches = [[], [valid, valid], [{**valid, "index": 1}],
@@ -67,7 +67,7 @@ class TextEmbeddingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duplicate"):
             self.model.generate_text_embedding(["denim", "linen"])
 
-    @patch("src.models.text_embedding.requests.post")
+    @patch("product_search.models.text_embedding.requests.post")
     def test_http_and_network_failures_are_not_fake_embeddings(self, post):
         post.return_value.raise_for_status.side_effect = requests.HTTPError("402 Insufficient credits")
         with self.assertRaises(requests.HTTPError):
@@ -77,9 +77,9 @@ class TextEmbeddingTests(unittest.TestCase):
         with self.assertRaises(requests.Timeout):
             self.model.generate_text_embedding("denim")
 
-    @patch("src.models.text_embedding.requests.post")
+    @patch("product_search.models.text_embedding.requests.post")
     def test_new_dimensions_build_reload_and_search(self, post):
-        from src.search.indexes import load_or_build
+        from product_search.search.indexes import load_or_build
         vectors = np.eye(2, DIMENSIONS, dtype=np.float32)
         post.side_effect = [
             Mock(json=Mock(return_value={"data": [

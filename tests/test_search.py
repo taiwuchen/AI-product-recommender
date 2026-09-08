@@ -9,20 +9,20 @@ import pandas as pd
 from PIL import Image
 
 from evaluation.run import metrics
-from src.models.vector_db import VectorDatabase
-from src.search.explanations import product_evidence
-from src.search.indexes import index_key, load_or_build
-from src.search.keyword import KeywordSearch
-from src.utils.data_loader import ProductDataLoader
+from product_search.models.vector_db import VectorDatabase
+from product_search.search.explanations import product_evidence
+from product_search.search.indexes import index_key, load_or_build
+from product_search.search.keyword import KeywordSearch
+from product_search.utils.data_loader import ProductDataLoader
 
 
 class SearchTests(unittest.TestCase):
     def test_failed_middle_image_keeps_correct_product_after_reload(self):
-        from src.models.image_embedding import ImageEmbeddingGenerator
+        from product_search.models.image_embedding import ImageEmbeddingGenerator
         generator = ImageEmbeddingGenerator.__new__(ImageEmbeddingGenerator)
         generator.generate_embedding_from_pil_image = Mock(side_effect=[[1, 0], [0, 1]])
         image = Image.new("RGB", (4, 4))
-        with patch("src.models.image_embedding.load_image", side_effect=[image, ValueError("missing"), image]):
+        with patch("product_search.models.image_embedding.load_image", side_effect=[image, ValueError("missing"), image]):
             vectors, ids, failures = generator.generate_batch_image_embeddings(["a", "b", "c"], ".")
         self.assertEqual(failures, [1])
         db = VectorDatabase()
